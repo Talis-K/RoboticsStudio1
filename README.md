@@ -24,6 +24,44 @@ git clone git@github.com:Talis-K/RoboticsStudio1.git
 
 ## Working on Repository
 
+Make sure that you pull from main into you branch before working on code and that you are in your bracnh when working on code!!!
+
+### How to Get the main Branch Content into Your Branch
+
+Make sure main bracnh is up to date
+```bash
+git checkout main
+git pull origin main
+```
+	
+Switch to your branch
+```bash
+git checkout <branch-name>
+```
+
+Merge the main branch with you branch
+```bash
+git merge main
+```
+
+### How to Get the Your Branch Content into main Branch
+
+While inside your branch, add, commit and push as usual
+```bash
+git status
+git add --all #Will add all files
+git commit -m ""
+git push
+```
+
+Then go to the git hub page:
+https://github.com/Talis-K/RoboticsStudio1
+
+You will seea yellow button on top, press the green buttons until the merge is complete. 
+
+If you need help with this part ask Talis.
+
+
 ## How To Run Simulation
 
 Since we all saved our reposiotries in the same locatio it should be the same code to run the simulation
@@ -41,7 +79,7 @@ ros2 launch 41068_ignition_bringup 41068_ignition_drone.launch.py slam:=true nav
 
 ## How to Make Sure Your Changes are in the Simulation
 
-if you edit the world files or model files you need to rebuild the build install and log folders.
+If you edit the world files or model files you need to rebuild the build install and log folders.
 
 * Remove the folders
 ```bash
