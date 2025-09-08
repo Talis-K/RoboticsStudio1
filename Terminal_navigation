@@ -1,0 +1,41 @@
+//------------ Change to your branch---------------//
+
+	git checkout <Your Name or main>
+
+//------------ How to get the main branch content into your branch---------//
+
+MAKE SURE MAIN BRANCH IS UP TO DATE
+
+	git checkout main
+	git pull origin main
+	
+SWITCH TO YOUR BRANCH
+
+	git checkout <Your Name>
+
+MERGE THE MAIN BRANCH INTO YOUR BRANCH
+
+	git merge main
+	
+//------------How to get your branch content into the main branch----------//
+
+NOT FINISHED
+
+//------------Ros2 Build Install Set Up Run------------------------------//
+#Remove old files
+	git rm -rf build/ install/ log/
+
+# Build the package
+	colcon build --symlink-install --packages-select 41068_ignition_bringup
+
+# Test the package
+	colcon test --event-handlers console_cohesion+ --packages-select 41068_ignition_bringup
+	colcon test-result --verbose
+
+# Source the workspace
+	source install/setup.bash
+
+# Launch the simulator
+	ros2 launch 41068_ignition_bringup 41068_ignition_drone.launch.py slam:=true nav2:=true rviz:=true world:=simple_trees
+
+
