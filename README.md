@@ -51,13 +51,20 @@ While inside your branch, add, commit and push as usual
 git status
 git add --all #Will add all files
 git commit -m ""
-git push
+git push origin <branch-name>
 ```
 
-Then go to the git hub page:
-https://github.com/Talis-K/RoboticsStudio1
-
-You will seea yellow button on top, press the green buttons until the merge is complete. 
+Then switch to main, and pull the latest version
+```bash
+git checkout main
+git pull origin main
+```
+Then merge with you branch
+```bash
+git merge <branch-name>
+git push origin main
+```
+This should work
 
 If you need help with this part ask Talis.
 
