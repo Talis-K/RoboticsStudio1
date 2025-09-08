@@ -54,7 +54,7 @@ git commit -m ""
 git push origin <branch-name>
 ```
 
-Then switch to main, and pull the latest version
+Then switch to main, and pull to make sure you have the latest version
 ```bash
 git checkout main
 git pull origin main
@@ -67,6 +67,29 @@ git push origin main
 This should work
 
 If you need help with this part ask Talis.
+
+### If Your Branch Is Behind On Commits @: https://github.com/Talis-K/RoboticsStudio1
+
+Checkout your branch
+```bash
+git checkout <branch-name>
+```
+Fetch origin
+```bash
+git fetch origin
+```
+
+Git status to see it is ahead by the amount of commits you are behind online
+```bash
+git status
+```
+
+Then simply push
+```bash
+git push
+```
+
+Check your branch is up to date with main @: https://github.com/Talis-K/RoboticsStudio1
 
 
 ## How To Run Simulation
