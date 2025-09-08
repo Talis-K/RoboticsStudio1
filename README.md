@@ -5,6 +5,7 @@ This has information on:
 * How to work on the repository
 * How to run the simulation
 * How to make sure your changes to the sim are actually being used in sim
+* Known Errors and Their Solutions
 
 ## Cloning Repository
 
