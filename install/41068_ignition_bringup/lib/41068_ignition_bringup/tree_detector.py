@@ -1,131 +1,125 @@
 #!/usr/bin/env python3
-# Shebang line: Tells the system to execute this file using Python 3 interpreter.
-
 import rclpy
-# Import rclpy: The ROS Client Library for Python, used for creating nodes, publishers, subscribers, etc.
-
 from rclpy.node import Node
-# Import Node class from rclpy: Base class for creating ROS 2 nodes.
-
-from sensor_msgs.msg import LaserScan
-# Import LaserScan message type: Standard ROS message for 2D lidar data (ranges, angles, etc.).
-
-from std_msgs.msg import Bool
-# Import Bool message type: Simple true/false message for detection output.
-
+from sensor_msgs.msg import PointCloud2
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
 import numpy as np
-# Import NumPy: Library for numerical operations, used here for array manipulation and clustering.
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+import struct
+from time import time
 
 class TreeDetector(Node):
-    """
-    A class to detect trees from filtered lidar data.
-    Subscribes to /filtered_scan, checks for tree patterns (e.g., clusters of close ranges), publishes Bool to /tree_detected.
-    Logs detection and increments a counter.
-    """
     def __init__(self):
-        # Constructor for TreeDetector class.
-        super().__init__('tree_detector_node')  # Call parent Node constructor with node name.
+        super().__init__('tree_detector_node')
         self.subscription = self.create_subscription(
-            # Create a subscription to listen for messages.
-            LaserScan,  # Message type to subscribe to.
-            '/filtered_scan',  # Topic to subscribe to (filtered lidar data).
-            self.lidar_callback,  # Callback function to call when message received.
-            10  # QoS depth (buffer size for incoming messages).
+            PointCloud2,
+            '/filtered_clusters',
+            self.cluster_callback,
+            10
         )
-        self.publisher = self.create_publisher(
-            # Create a publisher to send detection messages.
-            Bool,  # Message type to publish.
-            '/tree_detected',  # Topic to publish to.
-            10  # QoS depth.
+        self.marker_pub = self.create_publisher(Marker, '/visualization_marker', 10)
+        self.tree_counter = 0
+        self.detected_trees = []  # List of (x, y, timestamp)
+        self.get_logger().info('TreeDetector initialized. Analyzing /filtered_clusters for trees.')
+
+        self.curvature_threshold = 0.9  # R^2 <0.9 = curved tree
+
+    def cluster_callback(self, msg: PointCloud2):
+        x = []
+        y = []
+        offset = 0
+        for _ in range(msg.width):
+            x_val = struct.unpack('f', msg.data[offset:offset+4])[0]
+            y_val = struct.unpack('f', msg.data[offset+4:offset+8])[0]
+            x.append(x_val)
+            y.append(y_val)
+            offset += 12
+
+        x = np.array(x)
+        y = np.array(y)
+        if len(x) < 3:
+            self.get_logger().info('Cluster too small (<3 points), ignoring.')
+            return
+
+        # --- Circle fitting (Kasa method) ---
+        A = np.column_stack([2*x, 2*y, np.ones_like(x)])
+        b = x**2 + y**2
+        try:
+            sol, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+            xc, yc, c = sol
+            R = np.sqrt(c + xc**2 + yc**2)
+            curvature = 1.0 / R if R > 1e-6 else float('inf')
+        except np.linalg.LinAlgError:
+            self.get_logger().warn('Circle fit failed, skipping cluster.')
+            return
+
+        angular_span = np.max(np.arctan2(y, x)) - np.min(np.arctan2(y, x))
+        self.get_logger().info(
+            f'Cluster analysis: {len(x)} points, angular span ~{angular_span:.2f} rad, '
+            f'curvature = {curvature:.3f} (radius {R:.2f} m)'
         )
-        self.tree_counter = 0  # Initialize counter for detected trees (resets on restart; tweak to persist if needed).
-        self.timer = self.create_timer(1/3.0, self.timer_callback)  # Timer for 3 Hz logging (every ~0.33s).
-        self.last_detection_time = self.get_clock().now()  # Track last callback time for no-detection log.
-        self.get_logger().info('TreeDetector initialized. Detecting from /filtered_scan.')
 
-        # Detection params (tweak these for your simulation environment)
-        self.min_tree_distance = 0.5  # Min range to consider an obstacle (m) - increase to ignore close noise, decrease for sensitivity.
-        self.max_tree_distance = 5.0  # Max range for tree detection (m) - decrease if trees are closer, increase for farther.
-        self.min_cluster_size = 5  # Min number of consecutive points in a cluster to be a "tree" - lower for small trees, higher for larger.
-        self.tree_angle_threshold = 0.2  # Max angle span for a cluster to be a "tree" (radians, ~11.5 degrees) - adjust based on lidar resolution/tree width.
+        # --- Decision based on curvature ---
+        curvature_threshold = 0.5  # tune: higher = only strongly curved accepted
+        is_tree = curvature > curvature_threshold
 
-    def lidar_callback(self, msg: LaserScan):
-        """
-        Callback to detect trees:
-        - Find clusters of consecutive ranges within min/max distance.
-        - If cluster size/width matches "tree" pattern, detect as true.
-        - Publish Bool (true if any tree detected).
-        """
-        ranges = np.array(msg.ranges)  # Convert list of ranges to NumPy array.
-        angles = np.arange(msg.angle_min, msg.angle_max, msg.angle_increment)  # Generate angle array for the scan.
+        centroid_x = np.mean(x)
+        centroid_y = np.mean(y)
 
-        # Step 1: Mask ranges that could be obstacles (within thresholds).
-        obstacle_mask = (ranges > self.min_tree_distance) & (ranges < self.max_tree_distance)
+        # Deduplication
+        is_new_tree = True
+        current_time = time()
+        for tree_x, tree_y, timestamp in self.detected_trees:
+            dist = np.sqrt((centroid_x - tree_x)**2 + (centroid_y - tree_y)**2)
+            if dist < 0.5 and (current_time - timestamp) < 10.0:
+                is_new_tree = False
+                break
 
-        # Step 2: Find cluster starts and ends using diff (robust to full-mask).
-        diff_mask = np.diff(obstacle_mask.astype(int))  # Diff to find transitions (1: start, -1: end).
-        cluster_starts = np.where(diff_mask == 1)[0] + 1  # Starts after transition to True.
-        cluster_ends = np.where(diff_mask == -1)[0] + 1  # Ends after transition to False.
-
-        # Handle full-mask case (all obstacles: one cluster from 0 to len-1).
-        if np.all(obstacle_mask):
-            cluster_starts = [0]
-            cluster_ends = [len(ranges)]
-
-        # Handle wrap-around if first and last are True (circular scan).
-        if obstacle_mask[0] and obstacle_mask[-1]:
-            cluster_starts = np.insert(cluster_starts, 0, cluster_starts[-1] - len(ranges))  # Adjust for wrap.
-            cluster_ends = np.append(cluster_ends, cluster_ends[0] + len(ranges))  # Adjust for wrap.
-            # Note: This is simplified; for precise, calculate combined span.
-
-        is_tree_detected = False  # Flag for detection in this scan.
-        num_clusters = len(cluster_starts)  # Count clusters for logging.
-
-        for i in range(len(cluster_starts)):
-            start = cluster_starts[i]
-            end = cluster_ends[i] if i < len(cluster_ends) else len(ranges)  # Safe end index.
-            if end <= start:  # Skip invalid clusters.
-                continue
-
-            cluster_size = end - start  # Number of points in cluster.
-            cluster_angle_span = angles[end - 1] - angles[start]  # Angle width of cluster (last to first).
-
-            # Tree detection logic: Check if cluster matches tree pattern.
-            if cluster_size >= self.min_cluster_size and cluster_angle_span <= self.tree_angle_threshold:
-                is_tree_detected = True
-                break  # Detect if at least one tree-like cluster.
-
-        # Publish detection result.
-        detection_msg = Bool()  # Create Bool message.
-        detection_msg.data = is_tree_detected  # Set true/false.
-        self.publisher.publish(detection_msg)  # Publish to /tree_detected.
-
-        # Update last time for timer (even if no detection).
-        self.last_detection_time = self.get_clock().now()
-
-    def timer_callback(self):
-        """
-        Timer callback to log at 3 Hz.
-        Logs detection with counter if detected, or "No tree detected" if none in last period.
-        """
-        current_time = self.get_clock().now()  # Get current time.
-        time_since_last = (current_time - self.last_detection_time).nanoseconds / 1e9  # Seconds since last callback.
-        is_tree_detected = time_since_last < 0.33  # Approximate if detection happened recently (since 3 Hz = 0.33s).
-
-        if is_tree_detected:
-            self.tree_counter += 1  # Increment counter on detection.
-            self.get_logger().warn(f'Tree detected! Total trees detected: {self.tree_counter}')  # Log with counter.
+        if is_tree and is_new_tree:
+            self.tree_counter += 1
+            self.detected_trees.append((centroid_x, centroid_y, current_time))
+            self.get_logger().warn(
+                f'Another tree found, tree count now {self.tree_counter}'
+            )
+            self.publish_marker(centroid_x, centroid_y, True)
         else:
-            self.get_logger().info('No tree detected.')  # Log if no detection.
+            self.get_logger().info(
+                f'Cluster not a tree (curvature {curvature:.3f}, radius {R:.2f})'
+            )
+            self.publish_marker(centroid_x, centroid_y, False)
+
+    def publish_marker(self, x, y, is_tree):
+        marker = Marker()
+        marker.header.frame_id = "base_scan"
+        marker.header.stamp = self.get_clock().now().to_msg()
+        marker.type = Marker.SPHERE
+        marker.action = Marker.ADD
+        marker.scale.x = 0.2
+        marker.scale.y = 0.2
+        marker.scale.z = 0.2
+        marker.color.a = 1.0
+        if is_tree:
+            marker.color.r = 0.0
+            marker.color.g = 1.0
+            marker.color.b = 0.0
+        else:
+            marker.color.r = 1.0
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+        marker.pose.position = Point(x=x, y=y, z=0.0)
+        marker.pose.orientation.w = 1.0
+        marker.id = self.tree_counter if is_tree else -self.tree_counter
+        marker.lifetime.sec = 1
+        self.marker_pub.publish(marker)
 
 def main(args=None):
-    # Main entry point to run the node.
-    rclpy.init(args=args)  # Initialize ROS 2 context.
-    tree_detector = TreeDetector()  # Create instance of the node.
-    rclpy.spin(tree_detector)  # Keep node alive, processing callbacks.
-    tree_detector.destroy_node()  # Clean up node resources.
-    rclpy.shutdown()  # Shut down ROS 2 context.
+    rclpy.init(args=args)
+    tree_detector = TreeDetector()
+    rclpy.spin(tree_detector)
+    tree_detector.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == '__main__':
-    # Run main if file executed directly.
     main()

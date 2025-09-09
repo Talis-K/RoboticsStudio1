@@ -18,12 +18,15 @@
   <!-- Other -->
   <depend>robot_localization</depend>
 
-  <!-- subpackage_1-->
+  <!-- Python and sensor deps -->
   <depend>rclpy</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
-  <depend>numpy</depend>  <!-- For NumPy -->
-  <depend>scipy</depend>  <!-- For medfilt -->
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>  <!-- For NumPy -->
+  <exec_depend>python3-scipy</exec_depend>  <!-- For medfilt -->
+  <exec_depend>python3-sklearn</exec_depend>  <!-- For scikit-learn -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
