@@ -128,7 +128,7 @@ ros2 launch 41068_ignition_bringup 41068_ignition_drone.launch.py slam:=true nav
 ```
  * if you have issues try re-setting the source
  ```bash
-source ~/RoboticStudio1/install/setup.bash
+source ~/RoboticsStudio1/install/setup.bash
 ```
 
 ## Known Errors
