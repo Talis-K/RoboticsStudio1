@@ -73,19 +73,6 @@
       <name>oak3</name>
       <pose>6.0 -6.0 0 0 0 0</pose>
     </include>
-    
-        <include>
-      <uri>file:///home/student/41068_ws/install/41068_ignition_bringup/share/41068_ignition_bringup/models/tree_stump</uri>
-      <name>tree_stump</name>
-      <pose>2 -2 0 1.5708 -0 0</pose>
-    </include>
-    
-        <include>
-      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person</uri>
-      <name>Human</name>
-      <pose>0.01196 -1.97642 0.009508 0.015035 -0.002845 -0.016357</pose>
-    </include>
-
 
 <!-- Pine trees -->
     <include>
