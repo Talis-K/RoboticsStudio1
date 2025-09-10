@@ -99,7 +99,7 @@ Since we all saved our reposiotries in the same locatio it should be the same co
 
 * Set the source
 ```bash
-source ~/RoboticStudio1/install/setup.bash
+source ~/RoboticsStudio1/install/setup.bash
 ```
 
 * Run the simulation
@@ -152,7 +152,7 @@ To fix this, I suggest restarting the computer.
 If you get error with pathways such as:
 
 ```bash
-CMake Error: The current CMakeCache.txt directory /home/nathan/RoboticStudio1/build/41068_ignition_bringup/CMakeCache.txt is different than the directory /home/student/RoboticStudio1/build/41068_ignition_bringup where CMakeCache.txt was created. This may result in binaries being created in the wrong place. If you are not sure, reedit the CMakeCache.txt
+CMake Error: The current CMakeCache.txt directory /home/nathan/RoboticsStudio1/build/41068_ignition_bringup/CMakeCache.txt is different than the directory /home/student/RoboticsStudio1/build/41068_ignition_bringup where CMakeCache.txt was created. This may result in binaries being created in the wrong place. If you are not sure, reedit the CMakeCache.txt
 ```
 
 You have your repositorty in the wrong directory.

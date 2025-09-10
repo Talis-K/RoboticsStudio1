@@ -5,7 +5,6 @@ from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
 import numpy as np
 import logging
-from scipy import optimize
 
 class FilteredLidar(Node):
     def __init__(self):
@@ -82,31 +81,10 @@ class FilteredLidar(Node):
 
     def process_cluster(self, current_cluster, points):
         if len(current_cluster) >= self.min_cluster_size:
+            # Calculate average x and y for the cluster
             cluster_points = points[current_cluster]
-            
-            # Fit circle to estimate true center
-            try:
-                def calc_R(xc, yc):
-                    return np.sqrt((cluster_points[:,0] - xc)**2 + (cluster_points[:,1] - yc)**2)
-                
-                def f_2(c):
-                    Ri = calc_R(*c)
-                    return Ri - Ri.mean()
-                
-                # Initial guess: mean as center
-                center_estimate = np.mean(cluster_points, axis=0)
-                center_2, ier = optimize.leastsq(f_2, center_estimate)
-                
-                if ier not in [1, 2, 3, 4]:  # Check for successful convergence
-                    raise ValueError("Fitting did not converge")
-                
-                avg_x, avg_y = center_2
-            except:
-                # Fallback to mean if fitting fails
-                avg_x = np.mean(cluster_points[:, 0])
-                avg_y = np.mean(cluster_points[:, 1])
-                self.logger.warning(f'Circle fitting failed for cluster with {len(current_cluster)} points; using mean location.')
-            
+            avg_x = np.mean(cluster_points[:, 0])
+            avg_y = np.mean(cluster_points[:, 1])
             location = (avg_x, avg_y)
             
             # Check if this location is too close to any existing cluster
