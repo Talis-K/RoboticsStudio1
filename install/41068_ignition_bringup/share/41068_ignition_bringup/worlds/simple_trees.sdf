@@ -80,7 +80,7 @@
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
       </uri>
       <name>pine1</name>
-      <pose>5.0 2.5 0 0 0 0</pose>
+      <pose>1.0 0 0 0 0 0</pose>
     </include>
     <include>
       <uri>

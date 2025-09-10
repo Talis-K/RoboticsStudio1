@@ -7,17 +7,17 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED) # subpackage_1
+find_package(ament_cmake_python REQUIRED) # lidar_processing
 
 find_package(ros_ign_interfaces REQUIRED)
 
-# Install the Python module subpackage (subpackage_1)
-ament_python_install_package(subpackage_1)
+# Install the Python module subpackage (lidar_processing)
+ament_python_install_package(lidar_processing)
 
 # Install executable scripts (for ros2 run)
 install(PROGRAMS
-  subpackage_1/filtered_lidar.py
-  subpackage_1/tree_detector.py
+  lidar_processing/filtered_lidar.py
+  lidar_processing/tree_detector.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
