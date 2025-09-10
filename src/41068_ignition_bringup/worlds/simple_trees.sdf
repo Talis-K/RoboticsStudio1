@@ -105,12 +105,12 @@
     </include>
 
     <!-- Human -->
-    <!-- </include>
-      <uri>
-        https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person
-      </uri>
+        <!-- Human -->
+    <include>
+      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person</uri>
       <name>human1</name>
-      <pose>0.01196 -1.97642 0.009508 0.015035 -0.002845 -0.016357</pose>
-    </include> -->
+      <pose>0 2 0 0 0 0</pose>
+    </include>
+
   </world>
 </sdf>
