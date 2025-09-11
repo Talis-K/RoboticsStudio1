@@ -1,9 +1,0 @@
-setup.py
-subpackage_1/__init__.py
-subpackage_1/filtered_lidar.py
-subpackage_1/gui_panel.py
-subpackage_1/tree_detector.py
-subpackage_1.egg-info/PKG-INFO
-subpackage_1.egg-info/SOURCES.txt
-subpackage_1.egg-info/dependency_links.txt
-subpackage_1.egg-info/top_level.txt

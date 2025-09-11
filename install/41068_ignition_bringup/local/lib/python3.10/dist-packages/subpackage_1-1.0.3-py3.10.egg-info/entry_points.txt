@@ -1,3 +1,0 @@
-[console_scripts]
-gui_panel = subpackage_1.gui_panel:main
-
