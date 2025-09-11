@@ -74,11 +74,7 @@ def generate_launch_description():
         executable='create',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
-<<<<<<< Updated upstream
-        arguments=['-topic', '/robot_description', '-z', '2.0'] # z is height above ground
-=======
         arguments=['-topic', '/robot_description', '-z', '0.4']
->>>>>>> Stashed changes
     )
     ld.add_action(robot_spawner)
 

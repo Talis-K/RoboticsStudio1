@@ -1,0 +1,10 @@
+[0.014s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
+[0.042s] [31mCMake Error at CMakeLists.txt:13:
+[0.042s]   Parse error.  Expected a command name, got unquoted argument with text
+[0.042s]   "<<<<<<<".
+[0.042s] 
+[0.042s] [0m
+[0.042s] -- Configuring incomplete, errors occurred!
+[0.043s] See also "/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/CMakeOutput.log".
+[0.043s] gmake: *** [Makefile:226: cmake_check_build_system] Error 1
+[0.046s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
