@@ -43,8 +43,6 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-<<<<<<< Updated upstream
-=======
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/41068_ignition_bringup/environment" TYPE FILE FILES "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_environment_hooks/pythonpath.sh")
 endif()
 
@@ -77,7 +75,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
->>>>>>> Stashed changes
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/41068_ignition_bringup" TYPE DIRECTORY FILES
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/config"
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/launch"

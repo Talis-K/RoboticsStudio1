@@ -1,0 +1,29 @@
+Built target ament_cmake_python_copy_subpackage_1
+running egg_info
+writing subpackage_1.egg-info/PKG-INFO
+writing dependency_links to subpackage_1.egg-info/dependency_links.txt
+writing top-level names to subpackage_1.egg-info/top_level.txt
+reading manifest file 'subpackage_1.egg-info/SOURCES.txt'
+writing manifest file 'subpackage_1.egg-info/SOURCES.txt'
+Built target ament_cmake_python_build_subpackage_1_egg
+-- Install configuration: ""
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.sh
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.dsv
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/PKG-INFO
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/SOURCES.txt
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/dependency_links.txt
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/top_level.txt
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/filtered_lidar.py
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/gui_panel.py
+-- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/__init__.py
+Listing '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1'...
+Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/filtered_lidar.py'...
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/filtered_lidar.py
+[31mCMake Error at cmake_install.cmake:70 (file):
+  file INSTALL cannot find
+  "/home/student/RoboticsStudio1/src/41068_ignition_bringup/subpackage_1/tree_detector.py":
+  No such file or directory.
+
+[0m

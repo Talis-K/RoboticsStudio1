@@ -1,0 +1,11 @@
+WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+[31mCMake Error at /opt/ros/humble/share/ament_cmake_python/cmake/ament_python_install_package.cmake:66 (message):
+  ament_python_install_package() the Python package folder
+  '/home/student/RoboticsStudio1/src/41068_ignition_bringup/subpackage_1'
+  doesn't contain an '__init__.py' file
+Call Stack (most recent call first):
+  /opt/ros/humble/share/ament_cmake_python/cmake/ament_python_install_package.cmake:39 (_ament_cmake_python_install_package)
+  CMakeLists.txt:13 (ament_python_install_package)
+
+[0m
+gmake: *** [Makefile:226: cmake_check_build_system] Error 1

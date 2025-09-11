@@ -10,9 +10,6 @@ find_package(ament_cmake REQUIRED)
 
 find_package(ros_ign_interfaces REQUIRED)
 
-<<<<<<< Updated upstream
-=======
-# Install the Python module subpackage (subpackage_1)
 ament_python_install_package(subpackage_1)
 
 # Install executable scripts (for ros2 run)
@@ -24,7 +21,7 @@ install(PROGRAMS
 )
 
 # Install directories (configs, launch files, etc.)
->>>>>>> Stashed changes
+
 install(
   DIRECTORY config launch models urdf worlds urdf_drone
   DESTINATION share/${PROJECT_NAME}

@@ -1,0 +1,31 @@
+[0.017s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
+[0.101s] Built target ament_cmake_python_copy_subpackage_1
+[0.433s] running egg_info
+[0.436s] writing subpackage_1.egg-info/PKG-INFO
+[0.437s] writing dependency_links to subpackage_1.egg-info/dependency_links.txt
+[0.437s] writing top-level names to subpackage_1.egg-info/top_level.txt
+[0.441s] reading manifest file 'subpackage_1.egg-info/SOURCES.txt'
+[0.441s] writing manifest file 'subpackage_1.egg-info/SOURCES.txt'
+[0.487s] Built target ament_cmake_python_build_subpackage_1_egg
+[0.499s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
+[0.510s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/student/RoboticsStudio1/build/41068_ignition_bringup
+[0.518s] -- Install configuration: ""
+[0.518s] -- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.sh
+[0.518s] -- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.dsv
+[0.521s] -- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info
+[0.521s] -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/PKG-INFO
+[0.521s] -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/SOURCES.txt
+[0.521s] -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/dependency_links.txt
+[0.521s] -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info/top_level.txt
+[0.522s] -- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1
+[0.522s] -- Up-to-date: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/gui_panel.py
+[0.522s] -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/__init__.py
+[0.562s] Listing '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1'...
+[0.562s] Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/subpackage_1/__init__.py'...
+[0.568s] [31mCMake Error at cmake_install.cmake:70 (file):
+[0.568s]   file INSTALL cannot find
+[0.568s]   "/home/student/RoboticsStudio1/src/41068_ignition_bringup/subpackage_1/filtered_lidar.py":
+[0.568s]   No such file or directory.
+[0.568s] 
+[0.568s] [0m
+[0.570s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '1': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/student/RoboticsStudio1/build/41068_ignition_bringup
