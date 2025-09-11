@@ -105,184 +105,196 @@
 				"parent" : 0
 			},
 			{
+				"command" : 0,
+				"file" : 3,
+				"line" : 32,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 3,
+				"line" : 39,
+				"parent" : 0
+			},
+			{
 				"command" : 9,
 				"file" : 3,
-				"line" : 35,
+				"line" : 49,
 				"parent" : 0
 			},
 			{
 				"command" : 8,
 				"file" : 7,
 				"line" : 66,
-				"parent" : 12
+				"parent" : 14
 			},
 			{
 				"command" : 7,
 				"file" : 6,
 				"line" : 48,
-				"parent" : 13
+				"parent" : 15
 			},
 			{
 				"file" : 5,
-				"parent" : 14
+				"parent" : 16
 			},
 			{
 				"command" : 6,
 				"file" : 5,
 				"line" : 47,
-				"parent" : 15
+				"parent" : 17
 			},
 			{
 				"command" : 5,
 				"file" : 5,
 				"line" : 29,
-				"parent" : 16
+				"parent" : 18
 			},
 			{
 				"command" : 0,
 				"file" : 4,
 				"line" : 105,
-				"parent" : 17
+				"parent" : 19
 			},
 			{
 				"command" : 10,
 				"file" : 5,
 				"line" : 48,
-				"parent" : 15
+				"parent" : 17
 			},
 			{
 				"command" : 5,
 				"file" : 5,
 				"line" : 43,
-				"parent" : 19
+				"parent" : 21
 			},
 			{
 				"command" : 0,
 				"file" : 4,
 				"line" : 105,
-				"parent" : 20
+				"parent" : 22
 			},
 			{
 				"command" : 7,
 				"file" : 6,
 				"line" : 48,
-				"parent" : 13
+				"parent" : 15
 			},
 			{
 				"file" : 8,
-				"parent" : 22
+				"parent" : 24
 			},
 			{
 				"command" : 1,
 				"file" : 8,
 				"line" : 20,
-				"parent" : 23
+				"parent" : 25
 			},
 			{
 				"command" : 0,
 				"file" : 0,
 				"line" : 70,
-				"parent" : 24
+				"parent" : 26
 			},
 			{
 				"command" : 0,
 				"file" : 0,
 				"line" : 87,
-				"parent" : 24
+				"parent" : 26
 			},
 			{
 				"command" : 0,
 				"file" : 0,
 				"line" : 70,
-				"parent" : 24
+				"parent" : 26
 			},
 			{
 				"command" : 0,
 				"file" : 0,
 				"line" : 87,
-				"parent" : 24
+				"parent" : 26
 			},
 			{
 				"command" : 11,
 				"file" : 8,
 				"line" : 26,
-				"parent" : 23
+				"parent" : 25
 			},
 			{
 				"command" : 0,
 				"file" : 9,
 				"line" : 91,
-				"parent" : 29
+				"parent" : 31
 			},
 			{
 				"command" : 0,
 				"file" : 9,
 				"line" : 91,
-				"parent" : 29
+				"parent" : 31
 			},
 			{
 				"command" : 0,
 				"file" : 9,
 				"line" : 91,
-				"parent" : 29
+				"parent" : 31
 			},
 			{
 				"command" : 0,
 				"file" : 9,
 				"line" : 107,
-				"parent" : 29
+				"parent" : 31
 			},
 			{
 				"command" : 0,
 				"file" : 9,
 				"line" : 119,
-				"parent" : 29
+				"parent" : 31
 			},
 			{
 				"command" : 7,
 				"file" : 6,
 				"line" : 48,
-				"parent" : 13
+				"parent" : 15
 			},
 			{
 				"file" : 11,
-				"parent" : 35
+				"parent" : 37
 			},
 			{
 				"command" : 12,
 				"file" : 11,
 				"line" : 16,
-				"parent" : 36
+				"parent" : 38
 			},
 			{
 				"command" : 5,
 				"file" : 10,
 				"line" : 29,
-				"parent" : 37
+				"parent" : 39
 			},
 			{
 				"command" : 0,
 				"file" : 4,
 				"line" : 105,
-				"parent" : 38
+				"parent" : 40
 			},
 			{
 				"command" : 13,
 				"file" : 7,
 				"line" : 68,
-				"parent" : 12
+				"parent" : 14
 			},
 			{
 				"command" : 0,
 				"file" : 7,
 				"line" : 150,
-				"parent" : 40
+				"parent" : 42
 			},
 			{
 				"command" : 0,
 				"file" : 7,
 				"line" : 157,
-				"parent" : 40
+				"parent" : 42
 			}
 		]
 	},
@@ -353,6 +365,26 @@
 		{
 			"backtrace" : 11,
 			"component" : "Unspecified",
+			"destination" : "lib/41068_ignition_bringup",
+			"paths" : 
+			[
+				"gui/gui_panel.py"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 12,
+			"component" : "Unspecified",
+			"destination" : "share/41068_ignition_bringup/scripts",
+			"paths" : 
+			[
+				"gui/gui_panel.py"
+			],
+			"type" : "file"
+		},
+		{
+			"backtrace" : 13,
+			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
 			[
@@ -366,7 +398,7 @@
 			"type" : "directory"
 		},
 		{
-			"backtrace" : 18,
+			"backtrace" : 20,
 			"component" : "Unspecified",
 			"destination" : "share/ament_index/resource_index/package_run_dependencies",
 			"paths" : 
@@ -376,7 +408,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 21,
+			"backtrace" : 23,
 			"component" : "Unspecified",
 			"destination" : "share/ament_index/resource_index/parent_prefix_path",
 			"paths" : 
@@ -386,7 +418,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 25,
+			"backtrace" : 27,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup/environment",
 			"paths" : 
@@ -396,7 +428,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 26,
+			"backtrace" : 28,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup/environment",
 			"paths" : 
@@ -406,7 +438,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 27,
+			"backtrace" : 29,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup/environment",
 			"paths" : 
@@ -416,7 +448,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 28,
+			"backtrace" : 30,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup/environment",
 			"paths" : 
@@ -426,7 +458,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 30,
+			"backtrace" : 32,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
@@ -436,7 +468,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 31,
+			"backtrace" : 33,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
@@ -446,7 +478,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 32,
+			"backtrace" : 34,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
@@ -456,7 +488,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 33,
+			"backtrace" : 35,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
@@ -466,7 +498,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 34,
+			"backtrace" : 36,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
@@ -476,7 +508,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 39,
+			"backtrace" : 41,
 			"component" : "Unspecified",
 			"destination" : "share/ament_index/resource_index/packages",
 			"paths" : 
@@ -486,7 +518,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 41,
+			"backtrace" : 43,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup/cmake",
 			"paths" : 
@@ -497,7 +529,7 @@
 			"type" : "file"
 		},
 		{
-			"backtrace" : 42,
+			"backtrace" : 44,
 			"component" : "Unspecified",
 			"destination" : "share/41068_ignition_bringup",
 			"paths" : 
