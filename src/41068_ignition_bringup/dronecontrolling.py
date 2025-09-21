@@ -10,28 +10,29 @@ class DroneController(Node):
 
     # ---- Movement functions ----
     def move(self, speed, duration): #Negative is reverse, positive is forward
+        self.get_logger().info(f"Moving {duration}s at {speed} m/s")
         twist = Twist()
         twist.linear.x = speed
         self._publish_for_duration(twist, duration)
-        self.get_logger().info(f"Moving {duration}s at {speed} m/s")
 
     def height(self, speed, duration): #Negative is down, positive is up
+        self.get_logger().info(f"Changing height {duration}s at {speed} m/s")
         twist = Twist()
         twist.linear.z = speed
         self._publish_for_duration(twist, duration)
-        self.get_logger().info(f"Changing height {duration}s at {speed} m/s")
 
     def turn(self, angular_speed, duration): #Negative is turn right, positive is turn left
+        self.get_logger().info(f"Turning {duration}s at {angular_speed} rad/s")
         twist = Twist()
         twist.angular.z = angular_speed
         self._publish_for_duration(twist, duration)
-        self.get_logger().info(f"Turning {duration}s at {angular_speed} rad/s")
         
 
     def stop(self):
+        self.get_logger().warn("Drone has stopped")
         twist = Twist()  # all zeros
         self.cmd_pub.publish(twist)
-        self.get_logger().warn("Drone has stopped")
+        
 
     # ---- Internal helper ----
     def _publish_for_duration(self, twist, duration):
