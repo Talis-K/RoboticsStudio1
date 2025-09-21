@@ -15,6 +15,7 @@
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/slam_params.yaml
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/nav2_params.yaml
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/robot_localization.yaml
+/home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/ekf_odom.yaml
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/41068.rviz
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_navigation.launch.py
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_ignition.launch.py

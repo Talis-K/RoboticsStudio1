@@ -87,6 +87,15 @@ def generate_launch_description():
     )
     ld.add_action(gazebo_bridge)
 
+
+    ekf = Node(
+    package='robot_localization',
+    executable='ekf_node',
+    name='ekf_odom',
+    output='screen',
+    parameters=['/path/to/ekf_odom.yaml', {'use_sim_time': True}],
+    )
+
     # ---------------- RViz ----------------
     rviz_node = Node(
         package='rviz2',
