@@ -23,7 +23,7 @@ data_files += files_in('config', 'config')
 data_files += files_in('worlds', 'worlds')
 
 setup(
-    name=package_name,
+    name=python_pkg,
     version='0.1.0',
     packages=find_packages(include=[python_pkg, f'{python_pkg}.*']),
     data_files=data_files,
@@ -37,8 +37,10 @@ setup(
     # Console entry points you can run via ros2 run / launch as executable='gui_panel'
     entry_points={
         'console_scripts': [
-            # console-name  =  module.path:function
-            'gui_panel = bringup_41068.gui_panel:main',
+            'gui_panel = 41068_ignition_bringup.gui.gui_panel:main',
+            'filtered_lidar = 41068_ignition_bringup.gui.filtered_lidar:main',
+            'tree_detector = 41068_ignition_bringup.gui.tree_detector:main',
         ],
     },
+
 )
