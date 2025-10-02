@@ -53,20 +53,6 @@ class TreeDetection(Node):
         except Exception as e:
             self.logger.warning(f'Circle fitting failed: {e}')
             return
-
-        # Distances from LiDAR (assumed at origin)
-        centroid_dist = np.sqrt(cx**2 + cy**2)
-        point_dists = np.linalg.norm(points, axis=1)
-        mean_point_dist = np.mean(point_dists)
-
-        # Check if centroid is "behind" the points relative to LiDAR
-        if centroid_dist < mean_point_dist:
-            self.logger.info(
-                f'Cluster rejected: centroid closer to LiDAR ({centroid_dist:.2f} m) '
-                f'than cluster points (avg {mean_point_dist:.2f} m). '
-                f'Curve is facing the wrong way, not a tree.'
-            )
-            return
         
         # Classify cluster as tree or not
         if radius < 0.5:  # 50 cm threshold
