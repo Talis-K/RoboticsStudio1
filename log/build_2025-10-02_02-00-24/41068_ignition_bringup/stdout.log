@@ -55,11 +55,14 @@ Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/li
 Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/tree_detector.py'...
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/filtered_lidar.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/tree_detector.py
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/gui_panel.py
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/scripts/gui_panel.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/gazebo_bridge.yaml
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/slam_params.yaml
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/nav2_params.yaml
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/robot_localization.yaml
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/ekf_odom.yaml
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/41068.rviz
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_navigation.launch.py

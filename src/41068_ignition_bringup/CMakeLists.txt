@@ -21,6 +21,20 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+# Install GUI script so launch can run it
+install(PROGRAMS
+  gui/gui_panel.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+# If you also want it discoverable by ros2 run:
+# (optional) install it to share as well, for path-based launching
+install(PROGRAMS
+  gui/gui_panel.py
+  DESTINATION share/${PROJECT_NAME}/scripts
+)
+
+
 # Install directories (configs, launch files, etc.)
 install(
   DIRECTORY config launch models urdf worlds urdf_drone
