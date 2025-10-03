@@ -7,37 +7,11 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED) # lidar_processing
 
 find_package(ros_ign_interfaces REQUIRED)
 
-# Install the Python module subpackage (lidar_processing)
-ament_python_install_package(lidar_processing)
-
-# Install executable scripts (for ros2 run)
-install(PROGRAMS
-  lidar_processing/filtered_lidar.py
-  lidar_processing/tree_detector.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# Install GUI script so launch can run it
-install(PROGRAMS
-  gui/gui_panel.py
-  DESTINATION lib/${PROJECT_NAME}
-)
-
-# If you also want it discoverable by ros2 run:
-# (optional) install it to share as well, for path-based launching
-install(PROGRAMS
-  gui/gui_panel.py
-  DESTINATION share/${PROJECT_NAME}/scripts
-)
-
-
-# Install directories (configs, launch files, etc.)
 install(
-  DIRECTORY config launch models urdf worlds urdf_drone
+  DIRECTORY config launch models urdf worlds
   DESTINATION share/${PROJECT_NAME}
 )
 
