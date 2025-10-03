@@ -49,6 +49,7 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/models"
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/urdf"
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/worlds"
+    "/home/student/RoboticsStudio1/src/41068_ignition_bringup/urdf_drone"
     )
 endif()
 

@@ -233,7 +233,8 @@
 				"launch",
 				"models",
 				"urdf",
-				"worlds"
+				"worlds",
+				"urdf_drone"
 			],
 			"type" : "directory"
 		},

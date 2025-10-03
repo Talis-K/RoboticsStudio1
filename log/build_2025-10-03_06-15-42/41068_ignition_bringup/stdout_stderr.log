@@ -19,6 +19,7 @@
 -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
 -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
 -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
 -- Added test 'copyright' to check source files copyright and LICENSE
 -- Added test 'flake8' to check Python code syntax and style conventions
 -- Added test 'lint_cmake' to check CMake code style
@@ -37,6 +38,7 @@
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_navigation.launch.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_ignition.launch.py
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_ignition_drone.launch.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/models
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/models/grass_plane
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/models/grass_plane/model.config
@@ -75,6 +77,24 @@
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/worlds
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/worlds/simple_trees.sdf
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/worlds/large_demo.sdf
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/model.config
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/model.sdf
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/common_properties.urdf.xacro
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/4.png
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/2.png
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/5.png
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/1.png
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/3.png
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_fr.dae
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_fl.dae
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_rl.dae
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/hull.dae
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_rr.dae
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/parrot.gazebo.xacro
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/parrot.urdf.xacro
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/ament_index/resource_index/package_run_dependencies/41068_ignition_bringup
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/ament_index/resource_index/parent_prefix_path/41068_ignition_bringup
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/ament_prefix_path.sh
