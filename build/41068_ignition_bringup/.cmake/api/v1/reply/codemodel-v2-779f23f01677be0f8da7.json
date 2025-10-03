@@ -7,7 +7,7 @@
 				{
 					"build" : ".",
 					"hasInstallRule" : true,
-					"jsonFile" : "directory-.-a630b2a0fefd3d970813.json",
+					"jsonFile" : "directory-.-06e7efb2d9ddd483678b.json",
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.12"
@@ -17,7 +17,9 @@
 					"targetIndexes" : 
 					[
 						0,
-						1
+						1,
+						2,
+						3
 					]
 				}
 			],
@@ -33,7 +35,9 @@
 					"targetIndexes" : 
 					[
 						0,
-						1
+						1,
+						2,
+						3
 					]
 				}
 			],
@@ -44,6 +48,20 @@
 					"id" : "41068_ignition_bringup_uninstall::@6890427a1f51a3e7e1df",
 					"jsonFile" : "target-41068_ignition_bringup_uninstall-e7b1ee34ce0689c10ca4.json",
 					"name" : "41068_ignition_bringup_uninstall",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ament_cmake_python_build_lidar_processing_egg::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ament_cmake_python_build_lidar_processing_egg-e6c315a6a1ebe5d451cb.json",
+					"name" : "ament_cmake_python_build_lidar_processing_egg",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "ament_cmake_python_copy_lidar_processing::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ament_cmake_python_copy_lidar_processing-a65ca94b2d8377b259a9.json",
+					"name" : "ament_cmake_python_copy_lidar_processing",
 					"projectIndex" : 0
 				},
 				{

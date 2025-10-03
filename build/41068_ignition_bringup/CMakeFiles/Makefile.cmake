@@ -18,6 +18,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/opt/ros/humble/lib/cmake/fastcdr/fastcdr-config.cmake"
   "/opt/ros/humble/lib/cmake/fastcdr/fastcdr-dynamic-targets-none.cmake"
   "/opt/ros/humble/lib/cmake/fastcdr/fastcdr-dynamic-targets.cmake"
+  "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/environment_hook/pythonpath.sh.in"
   "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/package_level/local_setup.bash.in"
   "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/package_level/local_setup.sh.in"
   "/opt/ros/humble/lib/python3.10/site-packages/ament_package/template/package_level/local_setup.zsh.in"
@@ -576,6 +577,10 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "ament_cmake_core/stamps/templates_2_cmake.py.stamp"
   "ament_cmake_uninstall_target/ament_cmake_uninstall_target.cmake"
   "CTestConfiguration.ini"
+  "ament_cmake_core/stamps/pythonpath.sh.in.stamp"
+  "ament_cmake_environment_hooks/pythonpath.sh"
+  "ament_cmake_core/stamps/package.xml.stamp"
+  "ament_cmake_core/stamps/package_xml_2_cmake.py.stamp"
   "ament_cmake_core/stamps/package.xml.stamp"
   "ament_cmake_core/stamps/package_xml_2_cmake.py.stamp"
   "ament_cmake_core/stamps/ament_prefix_path.sh.stamp"
@@ -587,6 +592,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "ament_cmake_core/41068_ignition_bringupConfig.cmake"
   "ament_cmake_core/stamps/nameConfig-version.cmake.in.stamp"
   "ament_cmake_core/41068_ignition_bringupConfig-version.cmake"
+  "ament_cmake_python/lidar_processing/setup.py"
   "ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/41068_ignition_bringup"
   "ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/41068_ignition_bringup"
   "ament_cmake_index/share/ament_index/resource_index/packages/41068_ignition_bringup"
@@ -597,4 +603,6 @@ set(CMAKE_MAKEFILE_PRODUCTS
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/uninstall.dir/DependInfo.cmake"
   "CMakeFiles/41068_ignition_bringup_uninstall.dir/DependInfo.cmake"
+  "CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/DependInfo.cmake"
+  "CMakeFiles/ament_cmake_python_build_lidar_processing_egg.dir/DependInfo.cmake"
   )
