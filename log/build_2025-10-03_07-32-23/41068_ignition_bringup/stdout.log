@@ -55,6 +55,7 @@ Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/li
 Compiling '/home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/tree_detector.py'...
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/filtered_lidar.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/tree_detector.py
+-- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/gui_panel.py
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/gazebo_bridge.yaml
 -- Installing: /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/slam_params.yaml

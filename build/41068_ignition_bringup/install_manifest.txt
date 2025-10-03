@@ -9,6 +9,7 @@
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/__init__.py
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/filtered_lidar.py
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/tree_detector.py
+/home/student/RoboticsStudio1/install/41068_ignition_bringup/lib/41068_ignition_bringup/gui_panel.py
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/gazebo_bridge.yaml
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/slam_params.yaml
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/config/nav2_params.yaml
