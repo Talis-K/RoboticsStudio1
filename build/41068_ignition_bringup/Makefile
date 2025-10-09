@@ -198,6 +198,7 @@ uninstall/fast:
 .PHONY : 41068_ignition_bringup_uninstall/fast
 
 #=============================================================================
+<<<<<<< HEAD
 # Target rules for targets named ament_cmake_python_symlink_subpackage_1
 
 # Build rule for target.
@@ -209,19 +210,32 @@ ament_cmake_python_symlink_subpackage_1: cmake_check_build_system
 ament_cmake_python_symlink_subpackage_1/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir/build.make CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir/build
 .PHONY : ament_cmake_python_symlink_subpackage_1/fast
-
-#=============================================================================
-# Target rules for targets named ament_cmake_python_build_subpackage_1_egg
+=======
+# Target rules for targets named ament_cmake_python_copy_lidar_processing
 
 # Build rule for target.
-ament_cmake_python_build_subpackage_1_egg: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_build_subpackage_1_egg
-.PHONY : ament_cmake_python_build_subpackage_1_egg
+ament_cmake_python_copy_lidar_processing: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_copy_lidar_processing
+.PHONY : ament_cmake_python_copy_lidar_processing
 
 # fast build rule for target.
-ament_cmake_python_build_subpackage_1_egg/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_build_subpackage_1_egg.dir/build.make CMakeFiles/ament_cmake_python_build_subpackage_1_egg.dir/build
-.PHONY : ament_cmake_python_build_subpackage_1_egg/fast
+ament_cmake_python_copy_lidar_processing/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/build.make CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/build
+.PHONY : ament_cmake_python_copy_lidar_processing/fast
+>>>>>>> main
+
+#=============================================================================
+# Target rules for targets named ament_cmake_python_build_lidar_processing_egg
+
+# Build rule for target.
+ament_cmake_python_build_lidar_processing_egg: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_build_lidar_processing_egg
+.PHONY : ament_cmake_python_build_lidar_processing_egg
+
+# fast build rule for target.
+ament_cmake_python_build_lidar_processing_egg/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_build_lidar_processing_egg.dir/build.make CMakeFiles/ament_cmake_python_build_lidar_processing_egg.dir/build
+.PHONY : ament_cmake_python_build_lidar_processing_egg/fast
 
 # Help Target
 help:
@@ -237,8 +251,13 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... 41068_ignition_bringup_uninstall"
+<<<<<<< HEAD
 	@echo "... ament_cmake_python_build_subpackage_1_egg"
 	@echo "... ament_cmake_python_symlink_subpackage_1"
+=======
+	@echo "... ament_cmake_python_build_lidar_processing_egg"
+	@echo "... ament_cmake_python_copy_lidar_processing"
+>>>>>>> main
 	@echo "... uninstall"
 .PHONY : help
 

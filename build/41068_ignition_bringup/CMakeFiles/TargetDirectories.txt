@@ -1,7 +1,12 @@
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/uninstall.dir
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/41068_ignition_bringup_uninstall.dir
+<<<<<<< HEAD
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_build_subpackage_1_egg.dir
+=======
+/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_copy_lidar_processing.dir
+/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_build_lidar_processing_egg.dir
+>>>>>>> main
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/test.dir
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/edit_cache.dir
 /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/rebuild_cache.dir
