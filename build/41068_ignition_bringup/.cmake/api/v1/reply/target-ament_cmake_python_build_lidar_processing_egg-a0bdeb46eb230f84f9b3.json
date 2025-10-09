@@ -41,11 +41,7 @@
 	"dependencies" : 
 	[
 		{
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/target-ament_cmake_python_build_subpackage_1_egg-8a4c73002460b4c07f0c.json
-			"id" : "ament_cmake_python_symlink_subpackage_1::@6890427a1f51a3e7e1df"
-========
-			"id" : "ament_cmake_python_copy_lidar_processing::@6890427a1f51a3e7e1df"
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/target-ament_cmake_python_build_lidar_processing_egg-ed8113082eaabee2bbd8.json
+			"id" : "ament_cmake_python_symlink_lidar_processing::@6890427a1f51a3e7e1df"
 		}
 	],
 	"id" : "ament_cmake_python_build_lidar_processing_egg::@6890427a1f51a3e7e1df",

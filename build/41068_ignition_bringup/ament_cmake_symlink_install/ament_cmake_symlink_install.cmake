@@ -316,14 +316,20 @@ ament_cmake_symlink_install_files("/home/student/RoboticsStudio1/src/41068_ignit
 # install(FILES "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/41068_ignition_bringup/environment")
 ament_cmake_symlink_install_files("/home/student/RoboticsStudio1/src/41068_ignition_bringup" FILES "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_environment_hooks/pythonpath.dsv" "DESTINATION" "share/41068_ignition_bringup/environment")
 
-# install(DIRECTORY "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/subpackage_1/subpackage_1.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info")
-ament_cmake_symlink_install_directory("/home/student/RoboticsStudio1/src/41068_ignition_bringup" DIRECTORY "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/subpackage_1/subpackage_1.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/subpackage_1-1.0.3-py3.10.egg-info")
+# install(DIRECTORY "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info")
+ament_cmake_symlink_install_directory("/home/student/RoboticsStudio1/src/41068_ignition_bringup" DIRECTORY "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing.egg-info/" "DESTINATION" "local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info")
 
-# install(DIRECTORY "/home/student/RoboticsStudio1/src/41068_ignition_bringup/subpackage_1/" "DESTINATION" "local/lib/python3.10/dist-packages/subpackage_1" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
-ament_cmake_symlink_install_directory("/home/student/RoboticsStudio1/src/41068_ignition_bringup" DIRECTORY "/home/student/RoboticsStudio1/src/41068_ignition_bringup/subpackage_1/" "DESTINATION" "local/lib/python3.10/dist-packages/subpackage_1" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+# install(DIRECTORY "/home/student/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing/" "DESTINATION" "local/lib/python3.10/dist-packages/lidar_processing" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
+ament_cmake_symlink_install_directory("/home/student/RoboticsStudio1/src/41068_ignition_bringup" DIRECTORY "/home/student/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing/" "DESTINATION" "local/lib/python3.10/dist-packages/lidar_processing" "PATTERN_EXCLUDE" "*.pyc" "PATTERN_EXCLUDE" "__pycache__")
 
-# install(PROGRAMS "subpackage_1/filtered_lidar.py" "subpackage_1/tree_detector.py" "DESTINATION" "lib/41068_ignition_bringup")
-ament_cmake_symlink_install_programs("/home/student/RoboticsStudio1/src/41068_ignition_bringup" PROGRAMS "subpackage_1/filtered_lidar.py" "subpackage_1/tree_detector.py" "DESTINATION" "lib/41068_ignition_bringup")
+# install(PROGRAMS "lidar_processing/filtered_lidar.py" "lidar_processing/tree_detector.py" "DESTINATION" "lib/41068_ignition_bringup")
+ament_cmake_symlink_install_programs("/home/student/RoboticsStudio1/src/41068_ignition_bringup" PROGRAMS "lidar_processing/filtered_lidar.py" "lidar_processing/tree_detector.py" "DESTINATION" "lib/41068_ignition_bringup")
+
+# install(PROGRAMS "gui/gui_panel.py" "DESTINATION" "lib/41068_ignition_bringup")
+ament_cmake_symlink_install_programs("/home/student/RoboticsStudio1/src/41068_ignition_bringup" PROGRAMS "gui/gui_panel.py" "DESTINATION" "lib/41068_ignition_bringup")
+
+# install(PROGRAMS "gui/gui_panel.py" "DESTINATION" "share/41068_ignition_bringup/scripts")
+ament_cmake_symlink_install_programs("/home/student/RoboticsStudio1/src/41068_ignition_bringup" PROGRAMS "gui/gui_panel.py" "DESTINATION" "share/41068_ignition_bringup/scripts")
 
 # install(DIRECTORY "config" "launch" "models" "urdf" "worlds" "urdf_drone" "DESTINATION" "share/41068_ignition_bringup")
 ament_cmake_symlink_install_directory("/home/student/RoboticsStudio1/src/41068_ignition_bringup" DIRECTORY "config" "launch" "models" "urdf" "worlds" "urdf_drone" "DESTINATION" "share/41068_ignition_bringup")

@@ -538,11 +538,6 @@ set(CMAKE_MAKEFILE_PRODUCTS
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/uninstall.dir/DependInfo.cmake"
   "CMakeFiles/41068_ignition_bringup_uninstall.dir/DependInfo.cmake"
-<<<<<<< HEAD
-  "CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir/DependInfo.cmake"
-  "CMakeFiles/ament_cmake_python_build_subpackage_1_egg.dir/DependInfo.cmake"
-=======
-  "CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/DependInfo.cmake"
+  "CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/DependInfo.cmake"
   "CMakeFiles/ament_cmake_python_build_lidar_processing_egg.dir/DependInfo.cmake"
->>>>>>> main
   )

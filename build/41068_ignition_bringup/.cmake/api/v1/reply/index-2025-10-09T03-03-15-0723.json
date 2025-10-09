@@ -26,11 +26,7 @@
 	"objects" : 
 	[
 		{
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/index-2025-09-22T12-06-24-0737.json
-			"jsonFile" : "codemodel-v2-fb354af0146d1f836ebd.json",
-========
-			"jsonFile" : "codemodel-v2-9f8bede8d8303fb9aa18.json",
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/index-2025-10-09T02-36-52-0394.json
+			"jsonFile" : "codemodel-v2-f6093d5eb28edada6733.json",
 			"kind" : "codemodel",
 			"version" : 
 			{
@@ -45,11 +41,7 @@
 		{
 			"codemodel-v2" : 
 			{
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/index-2025-09-22T12-06-24-0737.json
-				"jsonFile" : "codemodel-v2-fb354af0146d1f836ebd.json",
-========
-				"jsonFile" : "codemodel-v2-9f8bede8d8303fb9aa18.json",
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/index-2025-10-09T02-36-52-0394.json
+				"jsonFile" : "codemodel-v2-f6093d5eb28edada6733.json",
 				"kind" : "codemodel",
 				"version" : 
 				{

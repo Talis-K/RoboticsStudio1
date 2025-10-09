@@ -7,11 +7,7 @@
 				{
 					"build" : ".",
 					"hasInstallRule" : true,
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-fb354af0146d1f836ebd.json
 					"jsonFile" : "directory-.-2333b78a4977d693cf4d.json",
-========
-					"jsonFile" : "directory-.-171c2dcaad87176046a4.json",
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-9f8bede8d8303fb9aa18.json
 					"minimumCMakeVersion" : 
 					{
 						"string" : "3.12"
@@ -56,28 +52,16 @@
 				},
 				{
 					"directoryIndex" : 0,
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-fb354af0146d1f836ebd.json
-					"id" : "ament_cmake_python_build_subpackage_1_egg::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-ament_cmake_python_build_subpackage_1_egg-8a4c73002460b4c07f0c.json",
-					"name" : "ament_cmake_python_build_subpackage_1_egg",
-========
 					"id" : "ament_cmake_python_build_lidar_processing_egg::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-ament_cmake_python_build_lidar_processing_egg-ed8113082eaabee2bbd8.json",
+					"jsonFile" : "target-ament_cmake_python_build_lidar_processing_egg-a0bdeb46eb230f84f9b3.json",
 					"name" : "ament_cmake_python_build_lidar_processing_egg",
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-9f8bede8d8303fb9aa18.json
 					"projectIndex" : 0
 				},
 				{
 					"directoryIndex" : 0,
-<<<<<<<< HEAD:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-fb354af0146d1f836ebd.json
-					"id" : "ament_cmake_python_symlink_subpackage_1::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-ament_cmake_python_symlink_subpackage_1-0eda41b300c9df9a688f.json",
-					"name" : "ament_cmake_python_symlink_subpackage_1",
-========
-					"id" : "ament_cmake_python_copy_lidar_processing::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-ament_cmake_python_copy_lidar_processing-ca237aaa355ee265b906.json",
-					"name" : "ament_cmake_python_copy_lidar_processing",
->>>>>>>> main:build/41068_ignition_bringup/.cmake/api/v1/reply/codemodel-v2-9f8bede8d8303fb9aa18.json
+					"id" : "ament_cmake_python_symlink_lidar_processing::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-ament_cmake_python_symlink_lidar_processing-8e00224c1d9684dc8332.json",
+					"name" : "ament_cmake_python_symlink_lidar_processing",
 					"projectIndex" : 0
 				},
 				{
