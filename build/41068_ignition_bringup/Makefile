@@ -198,17 +198,17 @@ uninstall/fast:
 .PHONY : 41068_ignition_bringup_uninstall/fast
 
 #=============================================================================
-# Target rules for targets named ament_cmake_python_copy_subpackage_1
+# Target rules for targets named ament_cmake_python_symlink_subpackage_1
 
 # Build rule for target.
-ament_cmake_python_copy_subpackage_1: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_copy_subpackage_1
-.PHONY : ament_cmake_python_copy_subpackage_1
+ament_cmake_python_symlink_subpackage_1: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_symlink_subpackage_1
+.PHONY : ament_cmake_python_symlink_subpackage_1
 
 # fast build rule for target.
-ament_cmake_python_copy_subpackage_1/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_copy_subpackage_1.dir/build.make CMakeFiles/ament_cmake_python_copy_subpackage_1.dir/build
-.PHONY : ament_cmake_python_copy_subpackage_1/fast
+ament_cmake_python_symlink_subpackage_1/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir/build.make CMakeFiles/ament_cmake_python_symlink_subpackage_1.dir/build
+.PHONY : ament_cmake_python_symlink_subpackage_1/fast
 
 #=============================================================================
 # Target rules for targets named ament_cmake_python_build_subpackage_1_egg
@@ -238,7 +238,7 @@ help:
 	@echo "... test"
 	@echo "... 41068_ignition_bringup_uninstall"
 	@echo "... ament_cmake_python_build_subpackage_1_egg"
-	@echo "... ament_cmake_python_copy_subpackage_1"
+	@echo "... ament_cmake_python_symlink_subpackage_1"
 	@echo "... uninstall"
 .PHONY : help
 
