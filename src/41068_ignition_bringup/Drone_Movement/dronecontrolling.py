@@ -6,30 +6,30 @@ class DroneController(Node):
     def __init__(self):
         super().__init__('drone_controller')
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.get_logger().info("Drone is ready to be controlled")
+        self.get_logger().info("[Drone Control] Drone is ready to be controlled")
 
     # ---- Movement functions ----
     def move(self, speed, duration): #Negative is reverse, positive is forward
-        self.get_logger().info(f"Moving {duration}s at {speed} m/s")
+        self.get_logger().info(f"[Drone Control] Moving {duration}s at {speed} m/s")
         twist = Twist()
         twist.linear.x = speed
         self._publish_for_duration(twist, duration)
 
     def height(self, speed, duration): #Negative is down, positive is up
-        self.get_logger().info(f"Changing height {duration}s at {speed} m/s")
+        self.get_logger().info(f"[Drone Control] Changing height {duration}s at {speed} m/s")
         twist = Twist()
         twist.linear.z = speed
         self._publish_for_duration(twist, duration)
 
     def turn(self, angular_speed, duration): #Negative is turn right, positive is turn left
-        self.get_logger().info(f"Turning {duration}s at {angular_speed} rad/s")
+        self.get_logger().info(f"[Drone Control] Turning {duration}s at {angular_speed} rad/s")
         twist = Twist()
         twist.angular.z = angular_speed
         self._publish_for_duration(twist, duration)
         
 
     def stop(self):
-        self.get_logger().warn("Drone has stopped")
+        self.get_logger().warn("[Drone Control] Drone has stopped")
         twist = Twist()  # all zeros
         self.cmd_pub.publish(twist)
         
