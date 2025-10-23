@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.sh
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.dsv
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info/PKG-INFO
@@ -77,4 +75,3 @@
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/cmake/41068_ignition_bringupConfig.cmake
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/cmake/41068_ignition_bringupConfig-version.cmake
 /home/student/RoboticsStudio1/install/41068_ignition_bringup/share/41068_ignition_bringup/package.xml
->>>>>>> main

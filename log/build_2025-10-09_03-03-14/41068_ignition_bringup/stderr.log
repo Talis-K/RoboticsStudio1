@@ -1,6 +1,0 @@
-WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
-WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
-failed to create symbolic link '/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing' because existing path cannot be removed: Is a directory
-gmake[2]: *** [CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/build.make:70: CMakeFiles/ament_cmake_python_symlink_lidar_processing] Error 1
-gmake[1]: *** [CMakeFiles/Makefile2:138: CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/all] Error 2
-gmake: *** [Makefile:146: all] Error 2
