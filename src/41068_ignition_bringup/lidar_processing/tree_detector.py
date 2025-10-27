@@ -14,10 +14,16 @@ class TreeDetection(Node):
         self.logger = logging.getLogger(__name__)
         
         # Initialize subscriber to /clusters topic
-        self.subscription = self.create_subscription(
+        self.subscription_clusters = self.create_subscription(
             Float32MultiArray,
             '/clusters',
             self.cluster_callback,
+            10
+        )
+
+        self.publish_geometry = self.create_publisher(
+            Float32MultiArray,
+            '/object_geometry',
             10
         )
         
@@ -35,15 +41,15 @@ class TreeDetection(Node):
         c, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
         center_x, center_y = c[0], c[1]
         radius = np.sqrt(c[2] + center_x**2 + center_y**2)
+        geom = Float32MultiArray()
+        geom.data = [center_x, center_y, radius]
+        self.publish_geometry.publish(geom)
         return center_x, center_y, radius
 
     def cluster_callback(self, msg):
         coords = np.array(msg.data)
-        if len(coords) < 6:  # need at least 3 points to fit a circle
-            self.logger.info('Invalid cluster data received.')
-            return
         
-        # Reshape into [n_points, 2] (x, y)
+        # Reshape (x, y)
         num_points = len(coords) // 2
         points = coords.reshape(num_points, 2)
         
