@@ -21,7 +21,7 @@
 			{
 				"command" : 2,
 				"file" : 1,
-				"line" : 15,
+				"line" : 14,
 				"parent" : 0
 			},
 			{
@@ -33,13 +33,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 122,
+				"line" : 141,
 				"parent" : 2
 			}
 		]
 	},
-	"id" : "ament_cmake_python_copy_lidar_processing::@6890427a1f51a3e7e1df",
-	"name" : "ament_cmake_python_copy_lidar_processing",
+	"dependencies" : 
+	[
+		{
+			"id" : "ament_cmake_python_copy_lidar_processing::@6890427a1f51a3e7e1df"
+		}
+	],
+	"id" : "ament_cmake_python_build_lidar_processing_egg::@6890427a1f51a3e7e1df",
+	"name" : "ament_cmake_python_build_lidar_processing_egg",
 	"paths" : 
 	{
 		"build" : ".",
@@ -67,13 +73,13 @@
 		{
 			"backtrace" : 3,
 			"isGenerated" : true,
-			"path" : "/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_copy_lidar_processing",
+			"path" : "/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_build_lidar_processing_egg",
 			"sourceGroupIndex" : 0
 		},
 		{
 			"backtrace" : 0,
 			"isGenerated" : true,
-			"path" : "/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_copy_lidar_processing.rule",
+			"path" : "/home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_build_lidar_processing_egg.rule",
 			"sourceGroupIndex" : 1
 		}
 	],

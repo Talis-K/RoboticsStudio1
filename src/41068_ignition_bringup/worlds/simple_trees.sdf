@@ -74,7 +74,7 @@
       <pose>6.0 -6.0 0 0 0 0</pose>
     </include>
 
-    <!-- Pine trees -->
+<!-- Pine trees -->
     <include>
       <uri>
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
@@ -103,13 +103,5 @@
       <name>pine4</name>
       <pose>-3.5 -4.0 0 0 0 0</pose>
     </include>
-
-    <!-- Human -->
-    <include>
-      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person</uri>
-      <name>human1</name>
-      <pose>0 2 0 0 0 0</pose>
-    </include>
-
   </world>
 </sdf>
