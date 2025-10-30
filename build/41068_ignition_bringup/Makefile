@@ -198,30 +198,30 @@ uninstall/fast:
 .PHONY : 41068_ignition_bringup_uninstall/fast
 
 #=============================================================================
-# Target rules for targets named ament_cmake_python_copy_41068_ignition_bringup
+# Target rules for targets named ament_cmake_python_copy_main_package
 
 # Build rule for target.
-ament_cmake_python_copy_41068_ignition_bringup: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_copy_41068_ignition_bringup
-.PHONY : ament_cmake_python_copy_41068_ignition_bringup
+ament_cmake_python_copy_main_package: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_copy_main_package
+.PHONY : ament_cmake_python_copy_main_package
 
 # fast build rule for target.
-ament_cmake_python_copy_41068_ignition_bringup/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_copy_41068_ignition_bringup.dir/build.make CMakeFiles/ament_cmake_python_copy_41068_ignition_bringup.dir/build
-.PHONY : ament_cmake_python_copy_41068_ignition_bringup/fast
+ament_cmake_python_copy_main_package/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_copy_main_package.dir/build.make CMakeFiles/ament_cmake_python_copy_main_package.dir/build
+.PHONY : ament_cmake_python_copy_main_package/fast
 
 #=============================================================================
-# Target rules for targets named ament_cmake_python_build_41068_ignition_bringup_egg
+# Target rules for targets named ament_cmake_python_build_main_package_egg
 
 # Build rule for target.
-ament_cmake_python_build_41068_ignition_bringup_egg: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_build_41068_ignition_bringup_egg
-.PHONY : ament_cmake_python_build_41068_ignition_bringup_egg
+ament_cmake_python_build_main_package_egg: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 ament_cmake_python_build_main_package_egg
+.PHONY : ament_cmake_python_build_main_package_egg
 
 # fast build rule for target.
-ament_cmake_python_build_41068_ignition_bringup_egg/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_build_41068_ignition_bringup_egg.dir/build.make CMakeFiles/ament_cmake_python_build_41068_ignition_bringup_egg.dir/build
-.PHONY : ament_cmake_python_build_41068_ignition_bringup_egg/fast
+ament_cmake_python_build_main_package_egg/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/ament_cmake_python_build_main_package_egg.dir/build.make CMakeFiles/ament_cmake_python_build_main_package_egg.dir/build
+.PHONY : ament_cmake_python_build_main_package_egg/fast
 
 # Help Target
 help:
@@ -237,8 +237,8 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... 41068_ignition_bringup_uninstall"
-	@echo "... ament_cmake_python_build_41068_ignition_bringup_egg"
-	@echo "... ament_cmake_python_copy_41068_ignition_bringup"
+	@echo "... ament_cmake_python_build_main_package_egg"
+	@echo "... ament_cmake_python_copy_main_package"
 	@echo "... uninstall"
 .PHONY : help
 

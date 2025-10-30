@@ -592,7 +592,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "ament_cmake_core/41068_ignition_bringupConfig.cmake"
   "ament_cmake_core/stamps/nameConfig-version.cmake.in.stamp"
   "ament_cmake_core/41068_ignition_bringupConfig-version.cmake"
-  "ament_cmake_python/41068_ignition_bringup/setup.py"
+  "ament_cmake_python/main_package/setup.py"
   "ament_cmake_index/share/ament_index/resource_index/package_run_dependencies/41068_ignition_bringup"
   "ament_cmake_index/share/ament_index/resource_index/parent_prefix_path/41068_ignition_bringup"
   "ament_cmake_index/share/ament_index/resource_index/packages/41068_ignition_bringup"
@@ -603,6 +603,6 @@ set(CMAKE_MAKEFILE_PRODUCTS
 set(CMAKE_DEPEND_INFO_FILES
   "CMakeFiles/uninstall.dir/DependInfo.cmake"
   "CMakeFiles/41068_ignition_bringup_uninstall.dir/DependInfo.cmake"
-  "CMakeFiles/ament_cmake_python_copy_41068_ignition_bringup.dir/DependInfo.cmake"
-  "CMakeFiles/ament_cmake_python_build_41068_ignition_bringup_egg.dir/DependInfo.cmake"
+  "CMakeFiles/ament_cmake_python_copy_main_package.dir/DependInfo.cmake"
+  "CMakeFiles/ament_cmake_python_build_main_package_egg.dir/DependInfo.cmake"
   )
