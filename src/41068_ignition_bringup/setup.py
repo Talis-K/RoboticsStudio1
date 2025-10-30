@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 from pathlib import Path
 
 package_name = '41068_ignition_bringup'     # ROS package name (can start with digits)
+python_pkg   = 'bringup_41068'              # Python module dir (must be a valid identifier)
 
 # Collect non-Python data (launch, config, worlds) for install
 def files_in(dirpath, install_subdir):
@@ -24,7 +25,7 @@ data_files += files_in('worlds', 'worlds')
 setup(
     name=package_name,
     version='0.1.0',
-    packages=find_packages(include=[package_name, f'{package_name}.*']),
+    packages=find_packages(include=[python_pkg, f'{python_pkg}.*']),
     data_files=data_files,
     install_requires=['setuptools', 'numpy', 'Pillow', 'sensor_msgs_py'],
     zip_safe=True,
@@ -37,7 +38,7 @@ setup(
     entry_points={
         'console_scripts': [
             # console-name  =  module.path:function
-            'odometry_listener = 41068_ignition_bringup.odom.odometry_listener:main',
+            'gui_panel = bringup_41068.gui_panel:main',
         ],
     },
 )
