@@ -1,17 +1,3 @@
-#!/usr/bin/env python3
-"""
-Mission Console GUI (ROS 2, Tkinter)
-- iOS-like light theme
-- Camera (auto raw/compressed)
-- LiDAR (LaserScan or PointCloud2) stabilised via TF2 into 'odom'
-- Clustering (eps/min_pts)
-- Robot marker from Odometry (XY + yaw) and altitude bar
-- E-STOP publish + subscribe
-- Extra mission/health: Battery, GPS, IMU (RPY), Flight mode
-- Waypoints (Path or PoseArray), cut-tree detections (PoseArray)
-- Breadcrumb trail, next-waypoint dashed leg, tree pins
-"""
-
 import io
 import math
 import time
