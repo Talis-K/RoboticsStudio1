@@ -17,18 +17,6 @@ from rclpy.duration import Duration
 from PIL import Image as PILImage
 from PIL import ImageTk
 
-<<<<<<< HEAD
-# ROS messages
-from sensor_msgs.msg import Image, LaserScan, CompressedImage, PointCloud2
-from sensor_msgs_py import point_cloud2 as pc2
-from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool, String
-from geometry_msgs.msg import PoseArray
-from sensor_msgs.msg import BatteryState, Imu, NavSatFix
-
-# TF2
-from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
-=======
 import sys
 import os
 
@@ -37,7 +25,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 #For the drone movement
 from Drone_Movement.dronecontrolling import DroneController as Drone
->>>>>>> parent of 3631dc2 (Works now)
 
 RAW_IMAGE_TYPE  = 'sensor_msgs/msg/Image'
 COMP_IMAGE_TYPE = 'sensor_msgs/msg/CompressedImage'

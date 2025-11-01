@@ -43,7 +43,6 @@ if(NOT DEFINED CMAKE_OBJDUMP)
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
-<<<<<<< HEAD
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/41068_ignition_bringup/environment" TYPE FILE FILES "/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_environment_hooks/pythonpath.sh")
 endif()
 
@@ -57,9 +56,6 @@ endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/local/lib/python3.10/dist-packages/lidar_processing" TYPE DIRECTORY FILES "/home/student/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing/" REGEX "/[^/]*\\.pyc$" EXCLUDE REGEX "/\\_\\_pycache\\_\\_$" EXCLUDE)
-=======
-  include("/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_symlink_install/ament_cmake_symlink_install.cmake")
->>>>>>> Will
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
@@ -70,7 +66,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
       )
 endif()
 
-<<<<<<< HEAD
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/lib/41068_ignition_bringup" TYPE PROGRAM FILES
     "/home/student/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing/filtered_lidar.py"
@@ -156,8 +151,6 @@ if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xUnspecifiedx" OR NOT CMAKE_INSTALL_
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/41068_ignition_bringup" TYPE FILE FILES "/home/student/RoboticsStudio1/src/41068_ignition_bringup/package.xml")
 endif()
 
-=======
->>>>>>> Will
 if(CMAKE_INSTALL_COMPONENT)
   set(CMAKE_INSTALL_MANIFEST "install_manifest_${CMAKE_INSTALL_COMPONENT}.txt")
 else()
