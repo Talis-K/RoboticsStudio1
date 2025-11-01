@@ -50,7 +50,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 #For the drone movement
-from Drone_Movement.dronecontrolling import DroneController as Drone
+from drone_control.dronecontrolling import DroneController as Drone
 
 RAW_IMAGE_TYPE  = 'sensor_msgs/msg/Image'
 COMP_IMAGE_TYPE = 'sensor_msgs/msg/CompressedImage'
