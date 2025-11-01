@@ -17,6 +17,7 @@ from rclpy.duration import Duration
 from PIL import Image as PILImage
 from PIL import ImageTk
 
+<<<<<<< HEAD
 # ROS messages
 from sensor_msgs.msg import Image, LaserScan, CompressedImage, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
@@ -27,6 +28,16 @@ from sensor_msgs.msg import BatteryState, Imu, NavSatFix
 
 # TF2
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
+=======
+import sys
+import os
+
+# Add the parent directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+#For the drone movement
+from Drone_Movement.dronecontrolling import DroneController as Drone
+>>>>>>> parent of 3631dc2 (Works now)
 
 RAW_IMAGE_TYPE  = 'sensor_msgs/msg/Image'
 COMP_IMAGE_TYPE = 'sensor_msgs/msg/CompressedImage'
@@ -170,6 +181,7 @@ class GuiNode(Node):
             self._estop = True
             try:
                 self.estop_pub.publish(Bool(data=True))
+                Drone.stop(self) #Stop-----------------------------------------------------------------------------------------------------------------------------
             except Exception:
                 pass
             self.get_logger().warn("[GUI] EMERGENCY STOP ENGAGED")
@@ -177,6 +189,7 @@ class GuiNode(Node):
     def reset_estop(self):
         if self._estop:
             self._estop = False
+
             try:
                 self.estop_pub.publish(Bool(data=False))
             except Exception:

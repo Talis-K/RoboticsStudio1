@@ -1,0 +1,27 @@
+[0.013s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/student/RoboticsStudio1/src/41068_ignition_bringup -DCMAKE_INSTALL_PREFIX=/home/student/RoboticsStudio1/install/41068_ignition_bringup
+[0.033s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.171s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.205s] -- Found ros_ign_interfaces: 0.244.20 (/opt/ros/humble/share/ros_ign_interfaces/cmake)
+[0.239s] -- Found rosidl_generator_c: 3.1.7 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.242s] -- Found rosidl_adapter: 3.1.7 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.248s] -- Found rosidl_generator_cpp: 3.1.7 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.260s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.274s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.451s] WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+[0.464s] -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[0.531s] WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+[0.552s] -- Added test 'copyright' to check source files copyright and LICENSE
+[0.560s] -- Added test 'flake8' to check Python code syntax and style conventions
+[0.561s] -- Added test 'lint_cmake' to check CMake code style
+[0.562s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[0.566s] -- Added test 'xmllint' to check XML markup files
+[0.567s] -- Configuring done
+[0.572s] -- Generating done
+[0.575s] -- Build files have been written to: /home/student/RoboticsStudio1/build/41068_ignition_bringup
+[0.582s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake /home/student/RoboticsStudio1/src/41068_ignition_bringup -DCMAKE_INSTALL_PREFIX=/home/student/RoboticsStudio1/install/41068_ignition_bringup
+[0.585s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
+[0.646s] failed to create symbolic link '/home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing' because existing path cannot be removed: Is a directory
+[0.646s] gmake[2]: *** [CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/build.make:70: CMakeFiles/ament_cmake_python_symlink_lidar_processing] Error 1
+[0.647s] gmake[1]: *** [CMakeFiles/Makefile2:138: CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/all] Error 2
+[0.647s] gmake: *** [Makefile:146: all] Error 2
+[0.649s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '2': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
