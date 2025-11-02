@@ -10,9 +10,9 @@ from rclpy.qos import (
 from geometry_msgs.msg import PoseArray, Pose
 
 
-def generate_snake_right_angles(min_x=0.0, max_x=5.0,
-                                min_y=0.0, max_y=5.0,
-                                step_y=0.5, z=0.5):
+def generate_snake_right_angles(min_x=-5.0, max_x=5.0,
+                                min_y=-5.0, max_y=5.0,
+                                step_y=1.0, z=0.5):
     """Generate waypoints in a right-angle snake pattern."""
     wps = []
     y = min_y
@@ -49,7 +49,7 @@ class WaypointPublisher(Node):
 
         # Generate waypoints
         coords = generate_snake_right_angles(
-            min_x=0.0, max_x=5.0, min_y=0.0, max_y=5.0, step_y=0.5, z=0.5
+            min_x=-5.0, max_x=5.0, min_y=-5.0, max_y=5.0, step_y=1.0, z=0.5
         )
 
         # Print them in array form to terminal
@@ -85,7 +85,7 @@ class WaypointPublisher(Node):
 class Goals():
     def position(self):
         self.coords = generate_snake_right_angles(
-            min_x=0.0, max_x=5.0, min_y=0.0, max_y=5.0, step_y=0.5, z=0.5
+            min_x=-5.0, max_x=5.0, min_y=-5.0, max_y=5.0, step_y=1.0, z=0.5
         )
         return self.coords
 

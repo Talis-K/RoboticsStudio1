@@ -51,7 +51,7 @@
       <pose>0 0 0 0 0 0</pose>
     </include>
 
-    <!-- Oak trees -->
+<!-- Oak trees -->
     <include>
       <uri>
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
