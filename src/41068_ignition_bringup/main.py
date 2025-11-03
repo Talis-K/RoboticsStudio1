@@ -72,7 +72,7 @@ def rotate(controller: DroneController, target, tolerance=0.03):
         wait_motion_finish(controller)
 
 
-def approach(controller: DroneController, target, tolerance=0.2, speed = 1.0):
+def move_to(controller: DroneController, target, tolerance=0.2, speed = 1.0):
     """
     Move the drone toward the target (x, y) coordinate until within tolerance.
     """
@@ -158,8 +158,7 @@ def main():
     try:
         for i, wp in enumerate(waypoints):
             print(f"Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
-            rotate(controller, wp)
-            approach(controller, wp)
+            move_to(controller, wp)
     #//////////////////////////////////////////////////////////////////////
 
     #/////////////////////// POST GOAL ACHIEVEMENT ////////////////////////

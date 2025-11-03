@@ -114,7 +114,7 @@ If you edit the world files or model files you need to rebuild the build install
 
 * Remove the folders
 ```bash
-git rm -rf build/ install/ log/
+rm -rf build/ install/ log/
 ```
 
 * Rebuild the folders

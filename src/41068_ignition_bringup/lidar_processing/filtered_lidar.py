@@ -46,7 +46,7 @@ class FilteredLidar(Node):
         cosy_cosp = 1 - 2 * (q.y**2 + q.z**2)
         self.current_pose['yaw'] = math.atan2(siny_cosp, cosy_cosp)
 
-    def lidar_callback(self, msg: LaserScan):
+    def lidar_callback(self, msg: LaserScan): # collects lidar data in drone frame and converts it to global frame
         ranges = np.array(msg.ranges)
         angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
         valid_mask = ~np.isnan(ranges) & ~np.isinf(ranges) & (ranges <= 2.5)
@@ -73,9 +73,9 @@ class FilteredLidar(Node):
             points_global[i, 0] = x_rot + self.current_pose['x']
             points_global[i, 1] = y_rot + self.current_pose['y']
         
-        self.detect_clusters(points_global, valid_angles, valid_ranges)
+        self.detect_clusters(points_global)
 
-    def detect_clusters(self, points, angles, ranges):
+    def detect_clusters(self, points): # uses the global lidar data  check how close each consecutive point is from the next if there are over 6 points within 7cm of the next one there is a cluster
         current_cluster_indices = [0]
         for i in range(1, len(points)):
             dist = np.linalg.norm(points[i] - points[i-1])
@@ -90,23 +90,22 @@ class FilteredLidar(Node):
         if len(cluster_indices) < self.min_cluster_size:
             return
 
-        cluster_points = points[cluster_indices]
-        cx, cy, radius = self.fit_circle(cluster_points)
+        cluster_points = points[cluster_indices] # points of the cluster are the iundexes generate in detect cluster from the array of total points (points)
+        cx, cy, radius = self.fit_circle(cluster_points) # use fit circle to get centroid and radius
         new_centroid = np.array([cx, cy])
 
         # Check if the new cluster is too close to existing clusters
-        for cluster in self.clusters:
+        for cluster in self.clusters: #_-------------------------------------------------------------------------------------------------edit so that it doesnt check the current scan index
             old_centroid = np.array(cluster['centroid'])
             if np.linalg.norm(new_centroid - old_centroid) <= self.min_centroid_dist:
                 # Too close, ignore this cluster
-                return
+                return # include that if the scan index is teh same and the clusters are less than the centroid distance that it is a human and pass to human function
 
         # Add new cluster
         self.clusters.append({
             'centroid': (cx, cy),
             'radius': radius,
             'points': cluster_points,
-            'published': False
         })
 
         # Publish cluster points
@@ -116,11 +115,7 @@ class FilteredLidar(Node):
         self.logger.info(f'New cluster published: center=({cx:.2f}, {cy:.2f}), '
                         f'radius={radius:.2f}, points={len(cluster_points)}')
 
-        # Mark as published
-        self.clusters[-1]['published'] = True
-
-
-    def fit_circle(self, points: np.ndarray):
+    def fit_circle(self, points: np.ndarray): # computes the radius, and centroid of a cluster by imagining the rest of the circle
         x = points[:, 0]
         y = points[:, 1]
         A = np.c_[2*x, 2*y, np.ones(points.shape[0])]
