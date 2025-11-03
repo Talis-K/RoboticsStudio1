@@ -15,25 +15,21 @@ class FilteredLidar(Node):
         self.logger = logging.getLogger(__name__)
         
         # Initialize subscriber to /scan topic
-        self.subscription = self.create_subscription(
-            LaserScan,
-            '/scan',
-            self.lidar_callback,
-            10
-        )
+        self.subscription = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
         
-        # Initialize publisher for /clusters topic
+        # Publishers
         self.publisher = self.create_publisher(Float32MultiArray, '/clusters', 10)
+        self.publish_geometry = self.create_publisher(Float32MultiArray, '/circle_geometry', 10)
         
         # Parameters for cluster detection
-        self.min_cluster_size = 5  # Minimum number of points in a cluster
-        self.sigma = 0.1   # Noise tolerance (meters); adjust if needed (e.g., 0.03-0.1 based on lidar noise)
-        self.duplicate_threshold = 0.20  # 10 cm for duplicate check
+        self.min_cluster_size = 5      # Minimum number of points in a cluster
+        self.sigma = 0.1               # Noise tolerance (meters)
+        self.duplicate_threshold = 0.30  # 30 cm threshold for new centroid acceptance
         
-        # Store unique cluster locations (avg_x, avg_y)
-        self.cluster_locations = []  # List of tuples (avg_x, avg_y)
+        # Store detected clusters: [{'centroid': (x, y), 'points': np.ndarray}]
+        self.clusters = []
         
-        self.logger.info('FilteredLidar initialized. Clustering /scan to /clusters with point coordinates.')
+        self.logger.info('FilteredLidar initialized. Clustering /scan to /clusters with circle fitting.')
 
     def lidar_callback(self, msg):
         # Extract ranges and angles
@@ -41,7 +37,7 @@ class FilteredLidar(Node):
         angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
         
         # Filter out invalid ranges (e.g., nan, inf)
-        valid_mask = ~np.isnan(ranges) & ~np.isinf(ranges) & (ranges > 0)
+        valid_mask = ~np.isnan(ranges) & ~np.isinf(ranges) & (ranges <= 20.0)
         valid_ranges = ranges[valid_mask]
         valid_angles = angles[valid_mask]
         
@@ -58,17 +54,17 @@ class FilteredLidar(Node):
         self.detect_clusters(points, valid_angles, valid_ranges)
 
     def detect_clusters(self, points, angles, ranges):
-        current_cluster = [0]  # Start with the first point
+        current_cluster = [0]
         
         for i in range(1, len(points)):
             # Calculate adaptive threshold
-            r1 = ranges[i-1]
+            r1 = ranges[i - 1]
             r2 = ranges[i]
-            delta_a = angles[i] - angles[i-1]
+            delta_a = angles[i] - angles[i - 1]
             adaptive_threshold = 2 * min(r1, r2) * np.sin(delta_a / 2) + self.sigma
             
             # Calculate Euclidean distance between consecutive points
-            dist = np.linalg.norm(points[i] - points[i-1])
+            dist = np.linalg.norm(points[i] - points[i - 1])
             
             if dist <= adaptive_threshold:
                 current_cluster.append(i)
@@ -76,39 +72,57 @@ class FilteredLidar(Node):
                 self.process_cluster(current_cluster, points)
                 current_cluster = [i]
         
-        # Check the final cluster
+        # Process the last cluster
         self.process_cluster(current_cluster, points)
 
     def process_cluster(self, current_cluster, points):
         if len(current_cluster) >= self.min_cluster_size:
-            # Calculate average x and y for the cluster
             cluster_points = points[current_cluster]
-            avg_x = np.mean(cluster_points[:, 0])
-            avg_y = np.mean(cluster_points[:, 1])
-            location = (avg_x, avg_y)
-            
-            # Check if this location is too close to any existing cluster
-            is_duplicate = False
-            for existing_loc in self.cluster_locations:
-                dist_to_existing = np.linalg.norm(np.array(location) - np.array(existing_loc))
-                if dist_to_existing <= self.duplicate_threshold:
-                    is_duplicate = True
-                    break
-            
-            if not is_duplicate:
-                # Add to unique locations
-                self.cluster_locations.append(location)
-                
-                # Prepare message with all point coordinates (x, y pairs)
-                coords = cluster_points.flatten()  # Flatten to [x1, y1, x2, y2, ...]
-                msg = Float32MultiArray()
-                msg.data = coords.tolist()
-                
-                # Publish the coordinates for this cluster
-                self.publisher.publish(msg)
-                
-                # Log the cluster with location
-                self.logger.info(f'Cluster found with {len(current_cluster)} points at location ({avg_x:.2f}, {avg_y:.2f})')
+
+            # Fit a circle to get accurate centroid + radius
+            cx, cy, radius = self.fit_circle(cluster_points)
+            new_centroid = np.array([cx, cy])
+
+            # Check if this centroid is far enough from existing ones
+            for cluster in self.clusters:
+                dist = np.linalg.norm(new_centroid - np.array(cluster['centroid']))
+                if dist <= self.duplicate_threshold:
+                    return  # Too close therefore skip
+
+            # Store new cluster
+            self.clusters.append({
+                'centroid': (cx, cy),
+                'radius' : radius,
+                'points': cluster_points
+            })
+
+            # Publish cluster points
+            msg = Float32MultiArray()
+            msg.data = cluster_points.flatten().tolist()
+            self.publisher.publish(msg)
+
+            self.logger.info(f'New cluster: center=({cx:.2f}, {cy:.2f}), '
+                             f'radius={radius:.2f}, points={len(cluster_points)}')
+
+    def fit_circle(self, points: np.ndarray):
+        """
+        Fit a circle to 2D points using least-squares.
+        Returns (center_x, center_y, radius).
+        """
+        x = points[:, 0]
+        y = points[:, 1]
+        A = np.c_[2*x, 2*y, np.ones(points.shape[0])]
+        b = x**2 + y**2
+        c, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+        center_x, center_y = c[0], c[1]
+        radius = np.sqrt(c[2] + center_x**2 + center_y**2)
+
+        # Publish geometry (center and radius)
+        geom = Float32MultiArray()
+        geom.data = [center_x, center_y, radius]
+        self.publish_geometry.publish(geom)
+
+        return center_x, center_y, radius
 
 def main(args=None):
     rclpy.init(args=args)

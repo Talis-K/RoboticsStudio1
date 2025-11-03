@@ -20,6 +20,8 @@ import numpy as np                                           # Used for Hypoteno
 from drone_control.dronecontrolling import DroneController   # Drone Control Access
 from path_planning.snake_path import Goals                   # Initial Waypoint List Access
 from drone_control.odometry_listener import OdometryListener # Live Odometry Feed Access
+from lidar_processing.filtered_lidar import FilteredLidar
+from lidar_processing.tree_detector import TreeDetection
 
 
 def wait_motion_finish(controller: DroneController, timeout=30.0):
@@ -47,7 +49,7 @@ def rotate(controller: DroneController, target, tolerance=0.03):
             time.sleep(0.05)
             continue
 
-        print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
+        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
 
         dx = target[0] - pose[0]
         dy = target[1] - pose[1]
@@ -57,7 +59,7 @@ def rotate(controller: DroneController, target, tolerance=0.03):
         yaw_error = math.atan2(math.sin(desired_yaw - pose[5]), math.cos(desired_yaw - pose[5]))
 
         if abs(yaw_error) <= tolerance:
-            print("[rotate] Orientation aligned.")
+            # print("[rotate] Orientation aligned.")
             return
 
         # Proportional angular speed
@@ -81,7 +83,7 @@ def approach(controller: DroneController, target, tolerance=0.2, speed = 1.0):
             time.sleep(0.05)
             continue
 
-        print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
+        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
 
         dx = target[0] - pose[0]
         dy = target[1] - pose[1]
@@ -98,7 +100,7 @@ def approach(controller: DroneController, target, tolerance=0.2, speed = 1.0):
         print(distance)
 
         if distance <= tolerance:
-            print("[approach] Target reached.")
+            print(f"[approach] Target reached. current pose: [{pose[0]}, {pose[1]}]")
             return True
 
         # Slow down near goal (min speed 0.1, max 1.0)
@@ -120,14 +122,21 @@ def main():
     # -------------------------- Nodes ---------------------------------
     odom = OdometryListener()
     OdometryListener._instance = odom
+
     controller = DroneController()
 
+    filter = FilteredLidar()
+
+    checker = TreeDetection()
 
     # One executor handles both nodes
     from rclpy.executors import MultiThreadedExecutor
-    executor = MultiThreadedExecutor(num_threads=2)
+    executor = MultiThreadedExecutor(num_threads=4)
     executor.add_node(odom)
     executor.add_node(controller)
+    executor.add_node(filter)
+    executor.add_node(checker)
+
 
     # Spin executor in background thread (safe)
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
