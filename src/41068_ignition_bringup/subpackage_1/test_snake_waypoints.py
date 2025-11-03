@@ -41,9 +41,9 @@ class WaypointPublisher(Node):
 
         # Latched QoS so late subscribers still receive the last message
         q = QoSProfile(depth=1)
-        q.durability = QoSDurabilityPolicy.TRANSIENT_LOCAL
+        q.durability  = QoSDurabilityPolicy.TRANSIENT_LOCAL
         q.reliability = QoSReliabilityPolicy.RELIABLE
-        q.history = QoSHistoryPolicy.KEEP_LAST
+        q.history     = QoSHistoryPolicy.KEEP_LAST
 
         self.pub = self.create_publisher(PoseArray, 'snake_waypoints', q)
 
@@ -75,10 +75,20 @@ class WaypointPublisher(Node):
         self.get_logger().info(
             f"Publishing {len(self.msg.poses)} waypoints on /snake_waypoints"
         )
+    
 
     def _publish(self):
         self.msg.header.stamp = self.get_clock().now().to_msg()
         self.pub.publish(self.msg)
+
+
+class Goals():
+    def position(self):
+        self.coords = generate_snake_right_angles(
+            min_x=0.0, max_x=5.0, min_y=0.0, max_y=5.0, step_y=0.5, z=0.5
+        )
+        return self.coords
+
 
 
 def main():
