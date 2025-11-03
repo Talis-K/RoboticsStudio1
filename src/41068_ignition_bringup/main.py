@@ -106,7 +106,7 @@ def approach(controller: DroneController, target, tolerance=0.2, speed = 1.0):
         # Slow down near goal (min speed 0.1, max 1.0)
 
         if distance < 1.5:
-            speed = distance/8   
+            speed = distance/6   
         duration = distance / speed /2
 
         controller.move_x(speed, duration)
@@ -135,7 +135,7 @@ def main():
     executor.add_node(odom)
     executor.add_node(controller)
     executor.add_node(filter)
-    executor.add_node(checker)
+    # executor.add_node(checker)
 
 
     # Spin executor in background thread (safe)
