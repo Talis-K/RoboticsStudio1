@@ -1,0 +1,5 @@
+WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/compiler_depend.make:3: *** empty variable name.  Stop.
+gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/all] Error 2
+gmake: *** [Makefile:146: all] Error 2

@@ -1,0 +1,5 @@
+[0.014s] Invoking command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8
+[0.059s] CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/compiler_depend.make:3: *** empty variable name.  Stop.
+[0.060s] gmake[1]: *** [CMakeFiles/Makefile2:137: CMakeFiles/ament_cmake_python_symlink_lidar_processing.dir/all] Error 2
+[0.060s] gmake: *** [Makefile:146: all] Error 2
+[0.062s] Invoked command in '/home/student/RoboticsStudio1/build/41068_ignition_bringup' returned '2': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/build/41068_ignition_bringup -- -j8 -l8

@@ -123,6 +123,22 @@ def generate_launch_description():
     )
     ld.add_action(gui_node)
 
+
+    path_node = Node(
+        package='41068_ignition_bringup',
+        executable='test_snake_waypoints.py',   # keep as-is since this works in your env
+        name='path_planning',
+        output='screen',
+        parameters=[{
+            'image_topic': image_topic,   # defaults to /camera/image
+            'scan_topic':  scan_topic,    # defaults to /scan
+            'cloud_topic': cloud_topic,   # set to a PointCloud2 topic if you want to use it
+            'estop_topic': '/e_stop',
+        }]
+        # , prefix='xterm -e'
+    )
+    ld.add_action(path_node)
+
     # ---------------- Nav2 ----------------
     nav2 = IncludeLaunchDescription(
         PathJoinSubstitution([pkg_path, 'launch', '41068_navigation.launch.py']),
