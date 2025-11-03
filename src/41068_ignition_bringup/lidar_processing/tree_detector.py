@@ -21,11 +21,6 @@ class TreeDetection(Node):
             10
         )
 
-        self.publish_geometry = self.create_publisher(
-            Float32MultiArray,
-            '/object_geometry',
-            10
-        )
         
         self.logger.info('TreeDetection initialized. Subscribing to /clusters to estimate tree radii.')
 
