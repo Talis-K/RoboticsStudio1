@@ -38,6 +38,46 @@ def generate_launch_description():
     )
     ld.add_action(nav2_launch_arg)
 
+
+
+    image_topic_launch_arg = DeclareLaunchArgument('image_topic', default_value='/camera/image')
+    scan_topic_launch_arg  = DeclareLaunchArgument('scan_topic',  default_value='/scan')
+    cloud_topic_launch_arg = DeclareLaunchArgument('cloud_topic', default_value='')  
+    odom_topic_launch_arg  = DeclareLaunchArgument('odom_topic',  default_value='/odometry/filtered')
+    estop_topic_arg       = DeclareLaunchArgument('estop_topic',       default_value='/e_stop')
+    max_altitude_arg      = DeclareLaunchArgument('max_altitude',      default_value='10.0')
+
+    battery_topic_arg     = DeclareLaunchArgument('battery_topic',     default_value='/battery')
+    gps_topic_arg         = DeclareLaunchArgument('gps_topic',         default_value='/gps/fix')
+    imu_topic_arg         = DeclareLaunchArgument('imu_topic',         default_value='/imu')
+    flight_mode_topic_arg = DeclareLaunchArgument('flight_mode_topic', default_value='/flight_mode')
+
+    waypoints_topic_arg   = DeclareLaunchArgument('waypoints_topic',   default_value='')          # empty by default
+    detections_topic_arg  = DeclareLaunchArgument('detections_topic',  default_value='/trees/cut')
+
+    for a in [image_topic_launch_arg, scan_topic_launch_arg, cloud_topic_launch_arg, odom_topic_launch_arg, estop_topic_arg,
+              max_altitude_arg, battery_topic_arg, gps_topic_arg, imu_topic_arg, flight_mode_topic_arg, waypoints_topic_arg,detections_topic_arg]:
+        ld.add_action(a)
+
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    image_topic  = LaunchConfiguration('image_topic')
+    scan_topic   = LaunchConfiguration('scan_topic')
+    cloud_topic  = LaunchConfiguration('cloud_topic')
+    ld.add_action(odom_topic_launch_arg)
+    ld.add_action(estop_topic_arg)
+    ld.add_action(max_altitude_arg)
+    ld.add_action(battery_topic_arg)
+    ld.add_action(gps_topic_arg)
+    ld.add_action(imu_topic_arg)
+    ld.add_action(flight_mode_topic_arg)
+    ld.add_action(waypoints_topic_arg)
+    ld.add_action(detections_topic_arg)
+    ld.add_action(DeclareLaunchArgument('baro_topic', default_value='/baro'))
+    ld.add_action(DeclareLaunchArgument('temperature_topic', default_value='/temperature'))
+    ld.add_action(DeclareLaunchArgument('altitude_mode', default_value='auto'))
+    ld.add_action(DeclareLaunchArgument('altitude_topic', default_value='')) 
+
+
     # Load robot_description and start robot_state_publisher
     robot_description_content = ParameterValue(
         Command(['xacro ',
@@ -127,5 +167,33 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('nav2'))
     )
     ld.add_action(nav2)
+
+    gui_node = Node(
+        package='41068_ignition_bringup',
+        executable='gui_panel.py',   
+        name='gui_panel',
+        output='screen',
+        parameters=[{
+            'image_topic': image_topic,   
+            'scan_topic':  scan_topic,   
+            'cloud_topic': cloud_topic,  
+            'odom_topic':   LaunchConfiguration('odom_topic'),
+            'estop_topic':       LaunchConfiguration('estop_topic'),
+            'max_altitude':      LaunchConfiguration('max_altitude'),
+
+            'battery_topic':     LaunchConfiguration('battery_topic'),
+            'gps_topic':         LaunchConfiguration('gps_topic'),
+            'imu_topic':         LaunchConfiguration('imu_topic'),
+            'flight_mode_topic': LaunchConfiguration('flight_mode_topic'),
+
+            'waypoints_topic':   LaunchConfiguration('waypoints_topic'),
+            'detections_topic':  LaunchConfiguration('detections_topic'),
+            'baro_topic':        LaunchConfiguration('baro_topic'),
+            'temperature_topic': LaunchConfiguration('temperature_topic'),
+            'altitude_mode':     LaunchConfiguration('altitude_mode'),
+            'altitude_topic':    LaunchConfiguration('altitude_topic'),
+        }]
+    )
+    ld.add_action(gui_node)
 
     return ld
