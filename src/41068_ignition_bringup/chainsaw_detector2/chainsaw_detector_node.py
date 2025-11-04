@@ -17,13 +17,18 @@ from std_msgs.msg import String, Float32
 # except Exception:
 AudioData = None
 
+# --- drop-in replacement for your ChainsawDetector class ---
+
+import time
+from collections import deque
+
 WINDOW_EPS = 1e-12
 
 class ChainsawDetector(Node):
     def __init__(self):
         super().__init__('chainsaw_detector')
 
-        # Parameters
+        # ---------- Params ----------
         self.declare_parameter('audio_topic', '/audio')
         self.declare_parameter('sample_rate', 16000)
         self.declare_parameter('frame_ms', 500)
@@ -33,6 +38,10 @@ class ChainsawDetector(Node):
         self.declare_parameter('confidence_thresh', 0.55)
         self.declare_parameter('pcm_width_bits', 16)
         self.declare_parameter('channels', 1)
+
+        # NEW: smoothing + logging
+        self.declare_parameter('decision_window', 5)   # number of frames to vote over
+        self.declare_parameter('log_period_sec', 1.0)  # throttle console prints
 
         self.audio_topic = self.get_parameter('audio_topic').get_parameter_value().string_value
         self.fs = int(self.get_parameter('sample_rate').value)
@@ -44,15 +53,19 @@ class ChainsawDetector(Node):
         self.pcm_bits = int(self.get_parameter('pcm_width_bits').value)
         self.channels = int(self.get_parameter('channels').value)
 
+        self.decision_window = int(self.get_parameter('decision_window').value)
+        self.log_period = float(self.get_parameter('log_period_sec').value)
+
         # Publishers
         self.pub_class = self.create_publisher(String, '/audio/classification', 10)
         self.pub_conf  = self.create_publisher(Float32, '/audio/chainsaw_confidence', 10)
         self.pub_f0    = self.create_publisher(Float32, '/audio/dominant_frequency', 10)
         self.pub_pwr   = self.create_publisher(Float32, '/audio/psd_band_power', 10)
 
-        qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, history=HistoryPolicy.KEEP_LAST, depth=10)
+        qos = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
+                         history=HistoryPolicy.KEEP_LAST, depth=10)
 
-        # Subscriber: AudioData (PCM bytes) or fallback Float32MultiArray (samples)
+        # Subscriber: AudioData (preferred) or Float32MultiArray fallback
         if AudioData is None:
             from std_msgs.msg import Float32MultiArray
             self._sub = self.create_subscription(Float32MultiArray, self.audio_topic, self._on_audio_float_array, qos)
@@ -60,7 +73,11 @@ class ChainsawDetector(Node):
         else:
             self._sub = self.create_subscription(AudioData, self.audio_topic, self._on_audio_data, qos)
 
+        # Buffers
         self.buffer = np.zeros(0, dtype=np.float32)
+        self.last_log_t = 0.0
+        self.decisions = deque(maxlen=max(1, self.decision_window))  # holds tuples (label, confidence, f0, rel_band_power)
+
         self.get_logger().info(f"[chainsaw_detector] Listening on {self.audio_topic} (fs={self.fs} Hz, frame={self.frame_len} samples)")
 
     # ---- Audio callbacks ----
@@ -96,14 +113,16 @@ class ChainsawDetector(Node):
             self.buffer = self.buffer[self.hop_len:]
             self._analyze_frame(frame)
 
-    # ---- Core analysis ----
+    # ---- Core analysis + smoothing + throttled logging ----
     def _analyze_frame(self, x: np.ndarray):
+        # FFT
         win = np.hanning(len(x))
         xw = x * win
         spec = np.fft.rfft(xw)
         mag = np.abs(spec) + WINDOW_EPS
         freqs = np.fft.rfftfreq(len(x), d=1.0/self.fs)
 
+        # band
         band_mask = (freqs >= self.band_lo) & (freqs <= self.band_hi)
         if not np.any(band_mask):
             return
@@ -116,28 +135,49 @@ class ChainsawDetector(Node):
         total_power = float(np.sum(mag**2)) + WINDOW_EPS
         rel_band_power = band_power / total_power
 
-        # Harmonicity score (check multiples of f0)
+        # harmonicity
         max_hz = 2000.0
         kmax = int(max_hz // max(f0, 1.0))
         hvals = []
         bw_hz = max(5.0, f0 * 0.05)
         for k in range(1, max(2, kmax + 1)):
-            target = k * f0
-            if target > freqs[-1]:
+            tgt = k * f0
+            if tgt > freqs[-1]:
                 break
-            mask = (freqs >= target - bw_hz) & (freqs <= target + bw_hz)
+            mask = (freqs >= tgt - bw_hz) & (freqs <= tgt + bw_hz)
             if np.any(mask):
                 hvals.append(np.max(mag[mask]))
         harm_score = float(np.mean(hvals) / (np.mean(mag) + WINDOW_EPS)) if hvals else 0.0
 
-        confidence = float(0.6 * np.clip(rel_band_power * 2.0, 0.0, 1.0) + 0.4 * np.clip(harm_score, 0.0, 1.0))
+        confidence = float(0.6 * np.clip(rel_band_power * 2.0, 0.0, 1.0) +
+                           0.4 * np.clip(harm_score, 0.0, 1.0))
         label = 'chainsaw' if confidence >= self.conf_thresh else 'ambient'
 
-        self.pub_class.publish(String(data=label))
-        self.pub_conf.publish(Float32(data=confidence))
-        self.pub_f0.publish(Float32(data=f0))
-        self.pub_pwr.publish(Float32(data=rel_band_power))
-        self.get_logger().info(f"class={label} conf={confidence:.2f} f0={f0:.1f}Hz bandPwr={rel_band_power:.2f}")
+        # ----- NEW: push raw decision to the smoothing queue -----
+        self.decisions.append((label, confidence, f0, rel_band_power))
+
+        # Majority vote label over last N frames
+        labels = [d[0] for d in self.decisions]
+        majority_label = max(set(labels), key=labels.count)
+
+        # Mean confidence/f0/power over the window
+        mean_conf = float(np.mean([d[1] for d in self.decisions]))
+        mean_f0   = float(np.mean([d[2] for d in self.decisions]))
+        mean_pwr  = float(np.mean([d[3] for d in self.decisions]))
+
+        # Publish the smoothed values
+        self.pub_class.publish(String(data=majority_label))
+        self.pub_conf.publish(Float32(data=mean_conf))
+        self.pub_f0.publish(Float32(data=mean_f0))
+        self.pub_pwr.publish(Float32(data=mean_pwr))
+
+        # Throttled logging (at most once per log_period seconds)
+        now = time.time()
+        if now - self.last_log_t >= self.log_period:
+            self.get_logger().info(
+                f"class={majority_label} conf={mean_conf:.2f} f0={mean_f0:.1f}Hz bandPwr={mean_pwr:.2f}"
+            )
+            self.last_log_t = now
 
 def main(args=None):
     rclpy.init(args=args)
@@ -151,3 +191,6 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+
+

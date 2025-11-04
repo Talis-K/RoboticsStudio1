@@ -55,6 +55,18 @@ def generate_launch_description():
     waypoints_topic_arg   = DeclareLaunchArgument('waypoints_topic',   default_value='')          # empty by default
     detections_topic_arg  = DeclareLaunchArgument('detections_topic',  default_value='/trees/cut')
 
+    chainsaw_status_topic_arg  = DeclareLaunchArgument(
+    'chainsaw_status_topic',  default_value='/audio/chainsaw/status',
+    description='String status from chainsaw detector'
+    )
+    chainsaw_metrics_topic_arg = DeclareLaunchArgument(
+        'chainsaw_metrics_topic', default_value='/audio/chainsaw/metrics',
+        description='Float32MultiArray [class_id,conf,f0_hz,band_power]'
+    )
+    ld.add_action(chainsaw_status_topic_arg)
+    ld.add_action(chainsaw_metrics_topic_arg)
+
+
     for a in [image_topic_launch_arg, scan_topic_launch_arg, cloud_topic_launch_arg, odom_topic_launch_arg, estop_topic_arg,
               max_altitude_arg, battery_topic_arg, gps_topic_arg, imu_topic_arg, flight_mode_topic_arg, waypoints_topic_arg,detections_topic_arg]:
         ld.add_action(a)
@@ -192,6 +204,9 @@ def generate_launch_description():
             'temperature_topic': LaunchConfiguration('temperature_topic'),
             'altitude_mode':     LaunchConfiguration('altitude_mode'),
             'altitude_topic':    LaunchConfiguration('altitude_topic'),
+            'chainsaw_status_topic':  LaunchConfiguration('chainsaw_status_topic'),
+            'chainsaw_metrics_topic': LaunchConfiguration('chainsaw_metrics_topic'),
+
         }]
     )
     ld.add_action(gui_node)

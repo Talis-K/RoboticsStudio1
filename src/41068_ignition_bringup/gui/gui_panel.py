@@ -26,7 +26,7 @@ from PIL import ImageTk
 from sensor_msgs.msg import Image, LaserScan, CompressedImage, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float32MultiArray
 from geometry_msgs.msg import PoseArray
 from sensor_msgs.msg import BatteryState, Imu, NavSatFix, FluidPressure, Temperature
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
@@ -81,6 +81,13 @@ class GuiNode(Node):
         self.declare_parameter('waypoints_topic', '')
         self.declare_parameter('detections_topic', '/trees/cut')
 
+        #Audio Detetction
+        # Audio / Chainsaw detector topics
+        self.declare_parameter('chainsaw_status_topic',  '/audio/chainsaw/status')   # std_msgs/String
+        self.declare_parameter('chainsaw_metrics_topic', '/audio/chainsaw/metrics')  # std_msgs/Float32MultiArray [class_id, conf, f0_hz, band_power]
+
+
+
         self.msg_queue = msg_queue
         self.img_queue = img_queue
 
@@ -134,6 +141,13 @@ class GuiNode(Node):
         self.imu_rpy: Optional[Tuple[float, float, float]] = None
         self.wind_ms: Optional[float] = None
         self.wind_heading_deg: Optional[float] = None
+
+        # Audio detection state
+        self.audio_class: Optional[str] = None      # "chainsaw" / "ambient" / "other"
+        self.audio_conf: Optional[float] = None     # 0..1
+        self.audio_f0_hz: Optional[float] = None    # dominant Hz
+        self.audio_band_power: Optional[float] = None
+
 
         # Barometer / Temperature
         self.baro_pressure_pa: Optional[float] = None
@@ -206,6 +220,16 @@ class GuiNode(Node):
         if dt:
             self.create_subscription(PoseArray, dt, self.on_tree_detections, 10)
 
+        # Chainsaw detector subscriptions
+        st = self.get_parameter('chainsaw_status_topic').get_parameter_value().string_value
+        if st:
+            self.create_subscription(String, st, self.on_chainsaw_status, 10)
+
+        mt = self.get_parameter('chainsaw_metrics_topic').get_parameter_value().string_value
+        if mt:
+            self.create_subscription(Float32MultiArray, mt, self.on_chainsaw_metrics, 10)
+
+
     # ---- E-STOP ----
     def engage_estop(self):
         if not self._estop:
@@ -246,6 +270,53 @@ class GuiNode(Node):
         else:
             self._img_sub = self.create_subscription(CompressedImage, cam_topic, self.on_image_compressed, 10)
         self._cam_type = cam_type
+
+
+    def on_chainsaw_status(self, msg: String):
+        """
+        Accepts lines like: 'class=chainsaw conf=1.00 f0=180.0Hz bandPwr=0.91'
+        Robust to extra/missing fields.
+        """
+        s = msg.data.strip()
+        # defaults
+        cls, conf, f0, bp = None, None, None, None
+        try:
+            for tok in s.replace(',', ' ').split():
+                if tok.startswith('class='):
+                    cls = tok.split('=',1)[1]
+                elif tok.startswith('conf='):
+                    conf = float(tok.split('=',1)[1])
+                elif tok.startswith('f0='):
+                    v = tok.split('=',1)[1].lower().replace('hz','')
+                    f0 = float(v)
+                elif tok.startswith('bandPwr=') or tok.startswith('bandpwr='):
+                    bp = float(tok.split('=',1)[1])
+        except Exception:
+            pass
+
+        # apply if present
+        if cls is not None: self.audio_class = cls
+        if conf is not None: self.audio_conf = conf
+        if f0 is not None: self.audio_f0_hz = f0
+        if bp is not None: self.audio_band_power = bp
+
+    def on_chainsaw_metrics(self, msg: Float32MultiArray):
+        """
+        Expects [class_id, conf, f0_hz, band_power]
+        class_id: 0=ambient, 1=chainsaw, 2=other (tweak to your node)
+        """
+        try:
+            data = list(msg.data)
+            if len(data) >= 4:
+                class_id = int(round(data[0]))
+                self.audio_conf = float(data[1])
+                self.audio_f0_hz = float(data[2])
+                self.audio_band_power = float(data[3])
+                self.audio_class = {0: "ambient", 1: "chainsaw", 2: "other"}.get(class_id, f"class_{class_id}")
+        except Exception:
+            pass
+
+
 
     def _resolve_camera_topic(self, requested: str):
         if requested:
@@ -493,7 +564,7 @@ class AppFigma:
         metrics.pack(side=tk.TOP, fill=tk.X)
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
-        self.card_heading = self._metric_card(metrics, "Heading",    "--",     "",                  1, icon=("compass",16))
+        self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
         self.card_home    = self._metric_card(metrics, "Home Dist",  "-- m",    "Within bounds",     3, icon=("home",16))
         self.card_time    = self._metric_card(metrics, "Flight Time","00:00",   "Elapsed",           4, icon=("time",16))
@@ -1021,6 +1092,19 @@ class AppFigma:
             self._metric_set(self.card_heading, f"{hdg:.0f}", card)
         else:
             self._metric_set(self.card_heading, "--", "")
+
+        # Audio / chainsaw detector metric
+        if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
+            f0 = f"{self.node.audio_f0_hz:.0f} Hz" if self.node.audio_f0_hz is not None else "-- Hz"
+            cls = (self.node.audio_class or "—")
+            if self.node.audio_conf is not None and math.isfinite(self.node.audio_conf):
+                sub = f"{cls} ({self.node.audio_conf:.2f})"
+            else:
+                sub = cls
+            self._metric_set(self.card_audio, f0, sub)
+        else:
+            self._metric_set(self.card_audio, "-- Hz", "no signal")
+
 
         # Speed (breadcrumb-based estimate)
         spd_ms = self._estimate_speed_ms()
