@@ -3,10 +3,8 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, Int32
 import numpy as np
-import logging
-import math
 
 
 class LidarDetection(Node):
@@ -18,53 +16,55 @@ class LidarDetection(Node):
         self.odom_subscription = self.create_subscription(Odometry, '/odom', self.odom_callback, 10)
 
         # Publishers
-        self.tree_pub = self.create_publisher(Float32MultiArray, '/clusters', 10)
-        self.geometry_pub = self.create_publisher(Float32MultiArray, '/obj_geometry', 10)
-        self.people_pub = self.create_publisher(Float32MultiArray, '/people', 10)
+        self.tree_pub = self.create_publisher(Float32MultiArray, '/trees', 10) # publishes detected trees,
+        self.geometry_pub = self.create_publisher(Float32MultiArray, '/obj_geometry', 10) # publishes centroid and radius of detected objects 
+        self.people_pub = self.create_publisher(Float32MultiArray, '/people', 10) # publishes detected people
+        self.tree_count_pub = self.create_publisher(Int32, '/tree_count', 10) # publishes number of detected trees
+        self.people_count_pub = self.create_publisher(Int32, '/people_count', 10) # publishes number of detected people 
+
 
         # Parameters
-        self.min_cluster_size = 5
-        self.max_point_dist = 0.13
-        self.min_centroid_dist = 1
-        self.human_leg_dist = 0.3
+        self.min_cluster_size = 5 # minimum number of points to identify a cluster
+        self.max_point_dist = 0.13 # maximum distance consecutive points can be from one another to not break the chain of points
+        self.min_centroid_dist = 1 # minimum distance cluster centroids must be apart from one anotehr to identify as new cluster
+        self.human_leg_dist = 0.3 # maximum distance two cluster can be apart from one anotehr to identify as human
 
         # Odometry
-        self.current_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0}
+        self.current_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0} # initial odom with zeros
 
         # Data structures
-        self.Trees = []   # All clusters seen
+        self.trees = []   # ADetected trees
         self.people = []     # Detected humans
         self.geometries = [] # all published geometries
         self.scan_index = 0  # Incremented each scan
 
-        self.get_logger().info('LidarDetection initialized with persistent cluster/human tracking.')
+        self.get_logger().info('LidarDetection initialized with persistent cluster/human tracking.') #initialisation log
 
     # ===============================
     # Odometry
     # ===============================
-    def odom_callback(self, msg: Odometry):
-        self.current_pose['x'] = msg.pose.pose.position.x
-        self.current_pose['y'] = msg.pose.pose.position.y
+    def odom_callback(self, msg: Odometry): # updates current_pose with the odometry reading from /odom
+        self.current_pose['x'] = msg.pose.pose.position.x # update x
+        self.current_pose['y'] = msg.pose.pose.position.y # update y
 
-        q = msg.pose.pose.orientation
+        q = msg.pose.pose.orientation # calculate and update yaw
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y**2 + q.z**2)
-        self.current_pose['yaw'] = math.atan2(siny_cosp, cosy_cosp)
+        self.current_pose['yaw'] = np.arctan2(siny_cosp, cosy_cosp)
 
     # ===============================
     # Lidar callback
     # ===============================
     def lidar_callback(self, msg: LaserScan):
-        self.scan_index += 1
+        self.scan_index += 1 # increase scan index
 
-        
-        ranges = np.array(msg.ranges)
-        angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges))
+        ranges = np.array(msg.ranges) # convert to numpy
+        angles = np.linspace(msg.angle_min, msg.angle_max, len(ranges)) # Generate evenly spaced angles from angle_min to angle_max, matching the number of ranges
         valid_mask = ~np.isnan(ranges) & ~np.isinf(ranges) & (ranges <= 1.5)
-        ranges = ranges[valid_mask]
-        angles = angles[valid_mask]
+        ranges = ranges[valid_mask] # only ranges 0 < ranges <= 1.5
+        angles = angles[valid_mask] # same indices as valid ranges
 
-        if len(ranges) < self.min_cluster_size:
+        if len(ranges) < self.min_cluster_size: # if not enough range for a cluster skip scan
             return
 
         # Convert to Cartesian coordinates (local frame)
@@ -73,17 +73,26 @@ class LidarDetection(Node):
         points_local = np.vstack((x_local, y_local)).T
 
         # Transform to global frame
-        cos_yaw = math.cos(self.current_pose['yaw'])
-        sin_yaw = math.sin(self.current_pose['yaw'])
+        cos_yaw = np.cos(self.current_pose['yaw'])
+        sin_yaw = np.sin(self.current_pose['yaw'])
         points_global = np.zeros_like(points_local)
 
         for i, (x, y) in enumerate(points_local):
             x_rot = x * cos_yaw - y * sin_yaw
             y_rot = x * sin_yaw + y * cos_yaw
-            points_global[i] = [x_rot + self.current_pose['x'], y_rot + self.current_pose['y']]
+            points_global[i] = [x_rot + self.current_pose['x'], y_rot + self.current_pose['y']] # Rotate to global orientation then add drone translation
 
         # Cluster detection
         self.detect_clusters(points_global)
+
+        # Publish tree and people counts after detection
+        tree_count_msg = Int32()
+        tree_count_msg.data = len(self.trees)
+        self.tree_count_pub.publish(tree_count_msg)
+
+        people_count_msg = Int32()
+        people_count_msg.data = len(self.people)
+        self.people_count_pub.publish(people_count_msg)
 
     # ===============================
     # Cluster detection
@@ -92,32 +101,31 @@ class LidarDetection(Node):
         """
         Detect clusters in a single LIDAR scan, including wrap-around at the scan boundary.
         """
-        if len(points) == 0:
-            return
 
         # Start the first cluster
-        current_cluster = [0]
-        scan_clusters = []
+        current_cluster = [0] # List of point indices in the current cluster
+        scan_clusters   = [] # Final list of valid clusters (after filtering)
 
         # Loop through points in order
         for i in range(1, len(points)):
-            dist = np.linalg.norm(points[i] - points[i - 1])
-            if dist <= self.max_point_dist:
-                current_cluster.append(i)
-            else:
-                if len(current_cluster) >= self.min_cluster_size:
-                    scan_clusters.append(self.save_cluster(current_cluster, points))
-                current_cluster = [i]
+            dist = np.linalg.norm(points[i] - points[i - 1]) # Compute Euclidean distance between current point and previous point
+            if dist <= self.max_point_dist: # If points are close enough they belong to the same cluster
+                current_cluster.append(i) # Add current point index to the ongoing cluster
+            else: # Otherwise, gap detected, end current cluster
+                if len(current_cluster) >= self.min_cluster_size: # Only save cluster if it has enough points
+                    scan_clusters.append(self.save_cluster(current_cluster, points)) # calculates and adds values for clusters to array
+                current_cluster = [i] # Start a new cluster with the current point
 
-        # Add the last cluster from the loop
+        # Add the last cluster from the loop incase there is no gap at the end
         if len(current_cluster) >= self.min_cluster_size:
             scan_clusters.append(self.save_cluster(current_cluster, points))
 
-        if len(scan_clusters) >= 2:
-            first_cluster = scan_clusters[0]
-            last_cluster = scan_clusters[-1]
-            dist_wrap = np.linalg.norm(first_cluster['points'][0] - last_cluster['points'][-1])
-            if dist_wrap <= self.max_point_dist:
+        #Making sure that we wrap around from 720 to 0
+        if len(scan_clusters) >= 2: # only matters if there are at least 2 clusters
+            first_cluster = scan_clusters[0] # first cluster
+            last_cluster = scan_clusters[-1] # last cluster
+            dist_wrap = np.linalg.norm(first_cluster['points'][0] - last_cluster['points'][-1]) # distance bewteen first point of first cluster and last point of last cluster
+            if dist_wrap <= self.max_point_dist: # if less than max point dist then they are the same object
                 # Merge last and first clusters
                 merged_points = np.vstack((last_cluster['points'], first_cluster['points']))
                 cx, cy, radius = self.fit_circle(merged_points)
@@ -130,235 +138,233 @@ class LidarDetection(Node):
                 # Replace clusters
                 scan_clusters = [merged_cluster] + scan_clusters[1:-1]
 
-        # Process the detected clusters
-        self.process_clusters(scan_clusters)
+        humans, used_indices = self.find_humans_in_scan(scan_clusters) # Look for humans
+
+        self.update_people_and_clusters(humans, scan_clusters, used_indices) # check agains current detected objects for duplicates
+
+        self._publish_geometries_live() # publish newest list of obsticales to avoid
 
 
     # ===============================
     # Save cluster
     # ===============================   
     def save_cluster(self, indices, points):
-        cluster_points = points[indices]
-        cx, cy, radius = self.fit_circle(cluster_points)
-        return {
+        cluster_points = points[indices] #cluster points are the points from the scan at indices
+        cx, cy, radius = self.fit_circle(cluster_points) # calulate values
+        return { # return values
             'centroid': (cx, cy),
             'radius': radius,
             'points': cluster_points,
             'scan_index': self.scan_index
-        }
+        } 
 
     # ===============================
     # Fit circle
     # ===============================
     def fit_circle(self, points):
-        x, y = points[:, 0], points[:, 1]
-        A = np.c_[2*x, 2*y, np.ones(len(points))]
-        b = x**2 + y**2
-        c, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
-        cx, cy = c[0], c[1]
-        r = np.sqrt(c[2] + cx**2 + cy**2)
-
-        return cx, cy, r
-
-    # ===============================
-    # Process clusters
-    # ===============================
-    def process_clusters(self, scan_clusters):
-        humans, used_indices = self.find_humans_in_scan(scan_clusters)
-
-        self.update_people_and_clusters(humans, scan_clusters, used_indices)
-
-        self._publish_geometries_live()
+        """
+        Fit a circle to a set of 2D points using least-squares
+        """
+        x, y = points[:, 0], points[:, 1] # Extract x and y coordinates from points array
+        A = np.c_[2*x, 2*y, np.ones(len(points))] # Build design matrix A: [2x, 2y, 1] for each point
+        b = x**2 + y**2   # Right-hand side: x² + y² for each point
+        c, _, _, _ = np.linalg.lstsq(A, b, rcond=None) # Solve A*c = b → c = [a, b, d] in circle eq: x²+y² + ax + by + d = 0
+        cx, cy = c[0], c[1]  # Circle center x = -a/2, y = -b/2 → but we use raw c[0], c[1]
+        r = np.sqrt(c[2] + cx**2 + cy**2)  # Radius = sqrt(d + cx² + cy²) → from completing the square
+        return cx, cy, r # Return center (cx, cy) and radius
+        
     
     def find_humans_in_scan(self, scan_clusters):
         """Identify human candidates from pairs of close clusters in the same scan."""
-        humans = []
-        used_indices = set()
+        humans = [] # List to store detected humans
+        used_indices = set() # Track which clusters are already used
 
-        for i in range(len(scan_clusters)):
-            if i in used_indices:
-                continue
-
-            c1 = np.array(scan_clusters[i]['centroid'])
-            for j in range(i + 1, len(scan_clusters)):
-                if j in used_indices:
-                    continue
-
-                c2 = np.array(scan_clusters[j]['centroid'])
-                dist = np.linalg.norm(c1 - c2)
-
-                if dist <= self.human_leg_dist:
-                    # Found two clusters close enough → person
-                    human_centroid = ((c1 + c2) / 2).tolist()
-                    combined_points = np.vstack((scan_clusters[i]['points'], scan_clusters[j]['points']))
-
-                    humans.append({
-                        'centroid': human_centroid,
-                        'points': combined_points,
-                        'scan_index': self.scan_index,
-                        'source_clusters': [i, j],
-                        'source_centroids': [scan_clusters[i]['centroid'], scan_clusters[j]['centroid']],
-                        'source_distance': dist
+        for i in range(len(scan_clusters)):# Loop over every cluster
+            if i in used_indices:  # Skip if this cluster is already part of a human
+                continue   # Go to next cluster
+            c1 = np.array(scan_clusters[i]['centroid']) # Get centroid of cluster i
+            for j in range(i + 1, len(scan_clusters)): # Loop over clusters after i (avoid duplicates)
+                if j in used_indices: # Skip if cluster j is already used
+                    continue # Go to next j
+                c2 = np.array(scan_clusters[j]['centroid']) # Get centroid of cluster j
+                dist = np.linalg.norm(c1 - c2) # Distance between two centroids
+                if dist <= self.human_leg_dist: # If within distance then identify as human
+                    human_centroid = ((c1 + c2) / 2).tolist()  # Midpoint = human center
+                    combined_points = np.vstack((scan_clusters[i]['points'], scan_clusters[j]['points']))  # Merge points
+                    humans.append({  # Save human data
+                        'centroid': human_centroid,      
+                        'points': combined_points,      
+                        'scan_index': self.scan_index,   
+                        'source_clusters': [i, j], 
+                        'source_centroids': [scan_clusters[i]['centroid'], scan_clusters[j]['centroid']],  # Leg centers
+                        'source_distance': dist  
                     })
-
-                    used_indices.update([i, j])
-                    break  # prevent one cluster forming multiple humans
-
-        return humans, used_indices
+                    used_indices.update([i, j]) # Mark both clusters as used
+                    break   
+        return humans, used_indices # Return humans and used cluster list
 
     # -----------------------------------------------------------------------
 
     def update_people_and_clusters(self, humans, scan_clusters, used_indices):
         """Update global lists based on detected humans and remaining clusters."""
-
-        # -----------------------------------------------------------------------
-        # Process humans (first)
-        # -----------------------------------------------------------------------
-        for human_idx, human in enumerate(humans):
-            hc = np.array(human['centroid'])
-            is_existing_human = False
-
+        for human in humans: # Loop through each new human from this scan
+            hc = np.array(human['centroid'])  # Human centroid as numpy array
+            is_existing_human = False # Flag: is this person already in self.people?
             # Check if it's a previously seen person
-            for person_idx, person in enumerate(self.people):
-                pc = np.array(person['centroid'])
-                dist = np.linalg.norm(hc - pc)
-                if dist <= self.min_centroid_dist:
-                    is_existing_human = True
-                    break
-
-            if is_existing_human:
-                continue
-
-            # Check if it matches any existing cluster
-            matched_cluster = None
-            for cluster_idx, tree in enumerate(self.Trees):
-                cc = np.array(tree['centroid'])
-                dist = np.linalg.norm(hc - cc)
-                if dist <= self.min_centroid_dist:
-                    self.get_logger().info(f"→ Matches existing cluster at{tree['centroid']}, will promote to person.")
-                    matched_cluster = tree
-                    break
-
+            for person in self.people:  # Loop through known people
+                pc = np.array(person['centroid']) # Known person centroid
+                dist = np.linalg.norm(hc - pc)  # Distance between new and old
+                if dist <= self.min_centroid_dist: # within min dist then same person
+                    is_existing_human = True # Mark as existing
+                    break # Stop checking
+            if is_existing_human:  # If already known, skip
+                continue # Go to next human
+            # Check if human matches any existing cluster
+            matched_cluster = None # Will hold tree to promote
+            for tree in self.trees:# Loop through stored trees
+                cc = np.array(tree['centroid'])# Tree centroid
+                dist = np.linalg.norm(hc - cc)# Distance to tree
+                if dist <= self.min_centroid_dist: # within min dist then promote tree to person
+                    self.get_logger().info(f"Human at ({human['centroid'][0]}, {human['centroid'][1]}) matches existing cluster at {tree['centroid']}, will promote to person.")
+                    matched_cluster = tree # Save reference
+                    break  # Stop checking
             # Combine points if matched
-            if matched_cluster:
-                self.Trees.remove(matched_cluster)
-                combined_points = np.vstack((human['points'], matched_cluster['points']))
-            else:
-                combined_points = human['points']
-
-            centroid_np = np.array(human['centroid'])
-            dists = np.linalg.norm(combined_points - centroid_np, axis=1)
-            max_radius = np.max(dists)
-
+            if matched_cluster: # If promoting a tree
+                self.trees.remove(matched_cluster)# Remove from trees
+                combined_points = np.vstack((human['points'], matched_cluster['points']))  # Merge points
+            else: # No match therefore new human
+                combined_points = human['points'] # Use only leg points
+            centroid_np = np.array(human['centroid'])# Human center as array
+            dists = np.linalg.norm(combined_points - centroid_np, axis=1) # Distance from center to each point
+            max_radius = np.max(dists) # Farthest point = radius, for avoidance purposes
             # Add new human
-            self.people.append({
-                'centroid': human['centroid'],
-                'radius': max_radius,
-                'points': combined_points,
-                'scan_index': self.scan_index
+            self.people.append({  # Save to global people list
+                'centroid': human['centroid'],                      
+                'radius': max_radius,                         
+                'points': combined_points,                           
+                'scan_index': self.scan_index             
             })
-
-            msg = Float32MultiArray()
-            msg.data = combined_points.flatten().tolist()
-            self.people_pub.publish(msg)
-
-            self._publish_geometries_live()
 
             # Log details of the formed human
             self.get_logger().info(
                 f"Published new human: "
-                f"Centroid: ({human['centroid'][0]:.2f}, {human['centroid'][1]:.2f}),"
-                f"radius= {max_radius}."
-                f"Total points: {len(combined_points)},"
-                f"Formed from clusters {human.get('source_clusters', 'unknown')},"
-                f"scan_index={tree['scan_index']}"
+                f"Centroid: ({human['centroid'][0]:.2f}, {human['centroid'][1]:.2f}), "
+                f"radius= {max_radius:.3f}. "
+                f"Total points: {len(combined_points)}, "
+                f"Formed from clusters {human.get('source_clusters', 'unknown')}, "
+                f"scan_index={self.scan_index}"
             )
-        
-        #procces remaining clusters
-        for idx, tree in enumerate(scan_clusters):
-
-            if idx in used_indices:
-                continue
-
-            cc = np.array(tree['centroid'])
-            is_duplicate = False
+        # Process remaining clusters
+        for idx, tree in enumerate(scan_clusters): # Loop through all clusters from this scan
+            if idx in used_indices: # Skip if used in a human
+                continue # Next cluster
+            cc = np.array(tree['centroid']) # Current cluster center
+            is_duplicate = False # Flag: already exists?
 
             # --- Check overlap with humans ---
-            for person_idx, person in enumerate(self.people):
-                pc = np.array(person['centroid'])
-                dist = np.linalg.norm(cc - pc)
-                if dist <= self.min_centroid_dist:
-                    is_duplicate = True
-                    break
-            if is_duplicate:
-                continue
-
+            for person_idx, person in enumerate(self.people):# Loop through known people
+                pc = np.array(person['centroid'])   # Person center
+                dist = np.linalg.norm(cc - pc)  # Distance to person
+                if dist <= self.min_centroid_dist: # Too close then ignore
+                    is_duplicate = True  # Mark as duplicate
+                    break # Stop checking
+            if is_duplicate: # If too close to a person
+                continue # Skip this cluster
             # --- Check overlap with existing clusters ---
-            for existing_idx, existing in enumerate(self.Trees):
-                ec = np.array(existing['centroid'])
-                dist = np.linalg.norm(cc - ec)
-                if dist <= self.min_centroid_dist:
-                    # Merge points from both clusters
-                    merged_points = np.vstack((existing['points'], tree['points']))
-                    cx, cy, r = self.fit_circle(merged_points)
+            for existing_idx, existing in enumerate(self.trees): # Loop through stored trees
+                ec = np.array(existing['centroid']) # Existing tree center
+                dist = np.linalg.norm(cc - ec) # Distance between trees
+                if dist <= self.min_centroid_dist:  # if close then merge for more detailed point cloud
 
+                    # Merge points from both clusters
+                    merged_points = np.vstack((existing['points'], tree['points']))  # Combine points
+                    cx, cy, r = self.fit_circle(merged_points) # Refit circle
                     # Update the existing cluster in place
-                    existing['points'] = merged_points
-                    existing['centroid'] = (cx, cy)
-                    existing['radius'] = r
-                    existing['scan_index'] = self.scan_index
+                    existing['points'] = merged_points # Update points
+                    existing['centroid'] = (cx, cy) # Update center
+                    existing['radius'] = r   # Update radius
+                    existing['scan_index'] = tree['scan_index'] # keep same scan
 
                     # Update geometry list to stay in sync with Trees
-                    if existing_idx < len(self.geometries):
-                        self.geometries[existing_idx] = [cx, cy, r]
-                    else:
-                        # This should only happen if Trees grew faster than geometries (e.g. first frame)
-                        self.geometries.append([cx, cy, r])
-
-                    is_duplicate = True
-                    break
-
-
-
+                    if existing_idx < len(self.geometries): # If geometry exists
+                        self.geometries[existing_idx] = [cx, cy, r] # Update it
+                    else:  # Rare: geometries list too short
+                        self.geometries.append([cx, cy, r]) # Add new
+                    is_duplicate = True  # Mark as merged
+                    break  # Stop checking
             # --- If not duplicate, add cluster ---
-            if not is_duplicate:
-                self.Trees.append(tree)
-                msg = Float32MultiArray()
-                msg.data = tree['points'].flatten().tolist()
-                self.tree_pub.publish(msg)
+            if not is_duplicate: # New tree
+                self.trees.append(tree) # Save to global trees
+                msg = Float32MultiArray() # Create message
+                msg.data = tree['points'].flatten().tolist() # Flatten points
+                self.tree_pub.publish(msg)  # Publish raw points
                 self.get_logger().info(
                     f"Published new tree: "
                     f"centroid=({tree['centroid'][0]:.2f}, {tree['centroid'][1]:.2f}), "
-                    f"radius={tree['radius']:.3f},"
-                    F"Total points={len(tree['points'])}, "
+                    f"radius={tree['radius']:.3f}, "
+                    f"Total points={len(tree['points'])}, "
                     f"scan_index={tree['scan_index']}"
                 )
-                self._publish_geometries_live()
 
 
     def _publish_geometries_live(self):
-            """Send every object (tree + person) as a Float32MultiArray right now."""
-            self.geometries = []                
+        """Send every object (tree + person) as a Float32MultiArray right now."""
+        self.geometries = []# Clear old geometry list
+        for obj in self.trees + self.people:# Loop through all trees and people
+            cx, cy = obj['centroid'] # Get center x, y
+            r = obj['radius']# Get radius
+            self.geometries.append([cx, cy, r])# Save [cx, cy, r] to list
+            msg = Float32MultiArray() # Create new message
+            msg.data = [cx, cy, r] # Pack center and radius
+            self.geometry_pub.publish(msg) # Publish one object
 
-            for obj in self.Trees + self.people:    
-                cx, cy = obj['centroid']
-                r      = obj['radius']
-                self.geometries.append([cx, cy, r])
+    # ------------------------------------------------------------------
+    def end(self):
+        """
+        Print everything and publish raw point clouds at shutdown.
+        """
+        # ---- 1. TREES ----
+        print("\n--- Detected Trees ---") # Header
+        for i, tree in enumerate(self.trees):   # Loop through all stored trees
+            print(f"Tree {i}:") # Tree number
+            print(f" Centroid : {tree['centroid']}") # Center position
+            print(f" Radius   : {tree['radius']:.3f}") # Radius
+            print(f" Points   : {len(tree['points'])}") # Number of points
+            print(f" Scan idx : {tree['scan_index']}")# Which scan
+            # publish tree point cloud
+            msg = Float32MultiArray() # New message
+            msg.data = tree['points'].flatten().tolist() # Flatten 2D points to 1D list
+            self.tree_pub.publish(msg) # Send raw points
 
-                msg = Float32MultiArray()
-                msg.data = [cx, cy, r]
-                self.geometry_pub.publish(msg)
+        # ---- 2. PEOPLE ----
+        print("\n--- Detected People ---") # Header
+        for i, person in enumerate(self.people): # Loop through all people
+            print(f"Person {i}:") # Person number
+            print(f" Centroid : {person['centroid']}") # Center
+            print(f" Radius   : {person['radius']:.3f}") # Radius
+            print(f" Points   : {len(person['points'])}") # Points
+            print(f" Scan idx : {person['scan_index']}") # Scan index
+            # publish person point cloud
+            msg = Float32MultiArray() # New message
+            msg.data = person['points'].flatten().tolist()  # Flatten points
+            self.people_pub.publish(msg) # Send raw points
 
-            self.get_logger().debug(f"Published {len(self.geometries)} live geometries")
-        # ------------------------------------------------------------------
+        # ---- 3. GEOMETRIES ----
+        print("\n--- Object Avoidance ---") # Header
+        for i, geom in enumerate(self.geometries):  # Loop through saved geometries
+            cx, cy, r = geom  # Unpack center and radius
+            print(f"Geometry {i}:") # Geometry number
+            print(f" Centroid : {cx:.2f}, {cy:.2f}") # Center
+            print(f" Radius   : {r:.4f}") # Radius
 
+    # ------------------------------------------------------------------
 def main(args=None):
-    rclpy.init(args=args)
-    node = LidarDetection()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
+    rclpy.init(args=args)                
+    node = LidarDetection()        
+    rclpy.spin(node)               
+    node.end()                  
+    node.destroy_node()    
+    rclpy.shutdown()    
 
 if __name__ == '__main__':
-    main()
+    main()    

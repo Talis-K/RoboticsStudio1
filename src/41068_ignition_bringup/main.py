@@ -38,7 +38,7 @@ def wait_motion_finish(controller: DroneController, timeout=30.0):
     #----------------------------------------------------------------------
         time.sleep(0.01) # Small delay for computer processing
 
-def rotate(controller: DroneController, pose, dx, dy, tolerance=0.03):
+def rotate(controller: DroneController, target, dx, dy, tolerance=0.03):
     """
     //////////////// ENSURES CORRECT YAW FOR WAYPOINT GOAL ////////////////
     """
@@ -51,6 +51,8 @@ def rotate(controller: DroneController, pose, dx, dy, tolerance=0.03):
             continue
     #----------------------------------------------------------------------
     #------------------------ Desired yaw error ---------------------------
+        dx = target[0] - pose[0]
+        dy = target[1] - pose[1]
 
         desired_yaw = np.arctan2(dy, dx)
         yaw_error = np.arctan2(np.sin(desired_yaw - pose[5]), np.cos(desired_yaw - pose[5]))
@@ -83,7 +85,7 @@ def move_to(controller: DroneController, target, tolerance=0.2, speed = 1.0):
         dy = target[1] - pose[1]
     #----------------------------------------------------------------------
     #------------------ Ensure Correct Yaw Orientation --------------------
-        rotate(controller, pose, dx, dy)
+        rotate(controller, target, dx, dy)
     #----------------------------------------------------------------------
         
         distance = np.hypot(dx, dy) #XY Plane distance to target
@@ -140,27 +142,7 @@ def main():
             print(f"[MAIN] Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
             move_to(controller, wp)
 
-        print("\n--- Detetced Trees ---")
-        for i, tree in enumerate(lidar.Trees):
-            print(f"Tree {i}:")
-            print(f"  Centroid: {tree['centroid']}")
-            print(f"  Radius: {tree['radius']}")
-            print(f"  Num points: {len(tree['points'])}")
-            print(f"  Scan index: {tree['scan_index']}")
-
-        print("\n--- Detected People ---")
-        for i, person in enumerate(lidar.people):
-            print(f"Person {i}:")
-            print(f"  Centroid: {person['centroid']}")
-            print(f"  Radius {person['radius']}")
-            print(f"  Num points: {len(person['points'])}")
-            print(f"  Scan index: {person['scan_index']}")
-        
-        print("\n--- object avoidance ---")
-        for i, geometry in enumerate(lidar.geometries):
-            print(f"Geometry {i}:")
-            print(f"  Centroid: {geometry[0]:.2f}, {geometry[1]:.2f}")
-            print(f"  Radius {geometry[2]}")
+        lidar.end()
     #----------------------------------------------------------------------
     #--------------------- Post simulation processing ---------------------
     finally:
