@@ -12,6 +12,8 @@ find_package(ros_ign_interfaces REQUIRED)
 
 # Install the Python module subpackage 
 ament_python_install_package(lidar_processing)
+ament_python_install_package(drone_control)
+ament_python_install_package(path_planning)
 ament_python_install_package(chainsaw_detector2)
 
 
@@ -21,6 +23,7 @@ install(PROGRAMS
   lidar_processing/tree_detector.py
   gui/gui_panel.py
   drone_control/odometry_listener.py
+  drone_control/dronecontrolling.py
   chainsaw_detector2/chainsaw_detector_node.py 
   chainsaw_detector2/test_audio_publisher.py
   main.py

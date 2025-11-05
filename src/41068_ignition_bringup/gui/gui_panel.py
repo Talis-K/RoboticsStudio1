@@ -62,7 +62,7 @@ class GuiNode(Node):
         self.declare_parameter('scan_topic', '/scan')
         self.declare_parameter('cloud_topic', '')
         self.declare_parameter('image_topic', '')
-        self.declare_parameter('odom_topic', '/odometry/filtered')
+        self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('estop_topic', '/e_stop')
         self.declare_parameter('max_altitude', 10.0)
 
@@ -80,8 +80,8 @@ class GuiNode(Node):
         self.declare_parameter('altitude_mode', 'auto')
         self.declare_parameter('altitude_topic', '')
 
-        # Waypoints & detections
-        self.declare_parameter('waypoints_topic', '')
+     
+
         self.declare_parameter('detections_topic', '/trees/cut')
 
         #Audio Detetction
@@ -144,6 +144,25 @@ class GuiNode(Node):
         self.position_xy: Optional[Tuple[float, float]] = None
         self.yaw_rad: Optional[float] = None
 
+
+
+                # --- IMU accel display options ---
+        self.declare_parameter('imu_gravity_comp', True)     # subtract gravity? (world frame)
+        self.declare_parameter('imu_show_world', True)       # display in world(odom) frame; else IMU body frame
+        self.declare_parameter('g0', 9.80665)                # gravity constant (m/s^2)
+        self.declare_parameter('accel_alpha', 0.3)           # EMA smoothing factor (0..1)
+
+        self._accel_alpha = float(self.get_parameter('accel_alpha').value)
+        self._g0 = float(self.get_parameter('g0').value)
+        self._imu_gravity_comp = bool(self.get_parameter('imu_gravity_comp').value)
+        self._imu_show_world    = bool(self.get_parameter('imu_show_world').value)
+
+        # live accel state
+        self.accel_body = None     # (ax, ay, az) in IMU/body frame (m/s^2)
+        self.accel_world = None    # (Ax, Ay, Az) in world/odom frame (m/s^2)
+        self.accel_mag = None      # |A| of whichever set we choose to show
+
+
         # Mission/health state
         self.battery_pct: Optional[float] = None
         self.flight_mode: Optional[str] = None
@@ -199,7 +218,20 @@ class GuiNode(Node):
         self.declare_parameter('chainsaw_high_hz',400.0)
         self.declare_parameter('audio_conf_thresh', 0.55)
         self.declare_parameter('audio_decision_window', 5)
-        self.mission_cmd_pub = self.create_publisher(String, '/mission/cmd', 10)
+        # Waypoints
+        self.declare_parameter('waypoints_path_topic',  '/mission/waypoints_path')
+        self.declare_parameter('waypoints_array_topic', '/mission/waypoints')
+
+
+        wpt_path = self.get_parameter('waypoints_path_topic').get_parameter_value().string_value or ''
+        wpt_arr  = self.get_parameter('waypoints_array_topic').get_parameter_value().string_value or ''
+
+        if wpt_path:
+            self.create_subscription(Path, wpt_path, self.on_path, qos_transient)
+        if wpt_arr:
+            self.create_subscription(PoseArray, wpt_arr, self.on_posearray_waypoints, qos_transient)
+
+        
         self.wp_idx = 0
         self.wp_total = 0
 
@@ -207,11 +239,10 @@ class GuiNode(Node):
                                                     lambda m: self._on_wp_idx(m.data), qos_transient)
         self.sub_wp_total = self.create_subscription(Int32, '/mission/waypoint_total',
                                                     lambda m: self._on_wp_total(m.data), qos_transient)
-
-        # Explicitly subscribe to your two mission waypoint topics with durability
-        self.create_subscription(Path, '/mission/waypoints_path', self.on_path, qos_transient)
-        self.create_subscription(PoseArray, '/mission/waypoints', self.on_posearray_waypoints, qos_transient)
-
+        self.declare_parameter('mission_cmd_topic', '/mission/cmd')
+        cmd_topic = self.get_parameter('mission_cmd_topic').get_parameter_value().string_value or '/mission/cmd'
+        self.mission_cmd_pub = self.create_publisher(String, cmd_topic, 10)
+        self.get_logger().info(f"[GUI] Command publisher on {cmd_topic}")
         self.mission_state = "IDLE"
         self.mission_progress = 0.0
 
@@ -266,17 +297,6 @@ class GuiNode(Node):
         if tpc:
             self.create_subscription(Temperature, tpc, self.on_temperature, 10)
 
-        # Waypoints
-        wpt = self.get_parameter('waypoints_topic').get_parameter_value().string_value
-        if wpt:
-            self.create_subscription(Path, wpt, self.on_path, 10)
-            self.create_subscription(PoseArray, wpt, self.on_posearray_waypoints, 10)
-        else:
-            for name, types in self.get_topic_names_and_types():
-                if 'nav_msgs/msg/Path' in types:
-                    self.create_subscription(Path, name, self.on_path, 10)
-                if 'geometry_msgs/msg/PoseArray' in types and 'waypoint' in name.lower():
-                    self.create_subscription(PoseArray, name, self.on_posearray_waypoints, 10)
 
         dt = self.get_parameter('detections_topic').get_parameter_value().string_value
         if dt:
@@ -290,6 +310,7 @@ class GuiNode(Node):
         mt = self.get_parameter('chainsaw_metrics_topic').get_parameter_value().string_value
         if mt:
             self.create_subscription(Float32MultiArray, mt, self.on_chainsaw_metrics, 10)
+
 
     def _on_wp_idx(self, v):   self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
@@ -334,6 +355,31 @@ class GuiNode(Node):
         else:
             self._img_sub = self.create_subscription(CompressedImage, cam_topic, self.on_image_compressed, 10)
         self._cam_type = cam_type
+
+    @staticmethod
+    def _quat_to_R(qx, qy, qz, qw):
+        # Rotation matrix: body -> world
+        xx, yy, zz = qx*qx, qy*qy, qz*qz
+        xy, xz, yz = qx*qy, qx*qz, qy*qz
+        wx, wy, wz = qw*qx, qw*qy, qw*qz
+        return [
+            [1-2*(yy+zz),   2*(xy-wz),     2*(xz+wy)],
+            [  2*(xy+wz), 1-2*(xx+zz),     2*(yz-wx)],
+            [  2*(xz-wy),   2*(yz+wx),   1-2*(xx+yy)]
+        ]
+
+    @staticmethod
+    def _mat_vec3(M, v):
+        return (
+            M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+            M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+            M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2],
+        )
+
+    @staticmethod
+    def _ema(prev, new, alpha):
+        if prev is None: return new
+        return tuple(alpha*n + (1-alpha)*p for p, n in zip(prev, new))
 
 
     def on_chainsaw_status(self, msg: String):
@@ -660,16 +706,44 @@ class GuiNode(Node):
      self.mission_cmd_pub.publish(String(data='stop'))
 
     def on_imu(self, msg: Imu):
+        # --- orientation to RPY (unchanged) ---
         q = msg.orientation
         sinr_cosp = 2 * (q.w * q.x + q.y * q.z)
         cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y)
         roll = math.atan2(sinr_cosp, cosr_cosp)
+
         sinp = 2 * (q.w * q.y - q.z * q.x)
         pitch = math.asin(max(-1.0, min(1.0, sinp)))
+
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         yaw = math.atan2(siny_cosp, cosy_cosp)
         self.imu_rpy = (roll, pitch, yaw)
+
+        # --- raw linear acceleration in IMU/body frame ---
+        ax = float(msg.linear_acceleration.x)
+        ay = float(msg.linear_acceleration.y)
+        az = float(msg.linear_acceleration.z)
+        a_body = (ax, ay, az)
+
+        # smooth body accel (EMA)
+        self.accel_body = self._ema(self.accel_body, a_body, self._accel_alpha)
+
+        # --- rotate to world and (optionally) remove gravity ---
+        R_bw = self._quat_to_R(q.x, q.y, q.z, q.w)       # body -> world
+        a_world = self._mat_vec3(R_bw, self.accel_body)
+
+        if self._imu_gravity_comp:
+            # subtract gravity in world Z (down = +g depending on convention; here we subtract +g on +Z)
+            a_world = (a_world[0], a_world[1], a_world[2] - self._g0)
+
+        # smooth world accel too (keeps both representations pleasant)
+        self.accel_world = self._ema(self.accel_world, a_world, self._accel_alpha)
+
+        # pick what to present in GUI
+        Ax, Ay, Az = (self.accel_world if self._imu_show_world else self.accel_body)
+        self.accel_mag = math.sqrt(Ax*Ax + Ay*Ay + Az*Az)
+
 
     def on_baro(self, msg: FluidPressure):
         if math.isfinite(msg.fluid_pressure) and msg.fluid_pressure > 0:
@@ -685,18 +759,24 @@ class GuiNode(Node):
                 self._altitude_baro = _hypsometric_altitude(self.baro_pressure_pa, T_k, self._p0_pa)
 
     def on_path(self, msg: Path):
-        pts = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
+        pts = [(p.pose.position.x, p.pose.position.y) for p in msg.poses] if msg.poses else []
         self.waypoints_xy = pts
         if self.position_xy and pts:
             rx, ry = self.position_xy
-            self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0]) ** 2 + (ry - pts[i][1]) ** 2)
+            try:
+                self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0])**2 + (ry - pts[i][1])**2)
+            except ValueError:
+                self.next_wp_idx = 0
 
     def on_posearray_waypoints(self, msg: PoseArray):
-        pts = [(p.position.x, p.position.y) for p in msg.poses]
+        pts = [(p.position.x, p.position.y) for p in msg.poses] if msg.poses else []
         self.waypoints_xy = pts
         if self.position_xy and pts:
             rx, ry = self.position_xy
-            self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0]) ** 2 + (ry - pts[i][1]) ** 2)
+            try:
+                self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0])**2 + (ry - pts[i][1])**2)
+            except ValueError:
+                self.next_wp_idx = 0
 
     def on_tree_detections(self, msg: PoseArray):
         self.tree_positions_xy = [(p.position.x, p.position.y) for p in msg.poses]
@@ -1210,11 +1290,11 @@ class AppFigma:
 
     def _send_cmd(self, cmd: str):
         try:
-            if not hasattr(self, 'mission_cmd_pub'):
-                self.mission_cmd_pub = self.node.create_publisher(String, '/mission/command', 10)
-            self.mission_cmd_pub.publish(String(data=cmd))
-        except Exception:
-            pass
+            self.node.mission_cmd_pub.publish(String(data=cmd))
+            print(f"[GUI] Sent mission cmd: {cmd}")
+        except Exception as e:
+            print(f"[GUI] Failed to publish mission cmd: {e}")
+
 
     # ------------------------------ Pollers (kept, with extra label updates) ----
     def poll_img(self):
@@ -1329,14 +1409,27 @@ class AppFigma:
                 f"Heading:    {(math.degrees(yaw) if yaw is not None else float('nan')):6.1f}"
             ))
 
-            # IMU (fix degree symbols)
+                        # --- IMU panel readout ---
             if self.node.imu_rpy:
                 r, p, y = self.node.imu_rpy
-                self.lbl_imu.config(text=f"Roll: {math.degrees(r):.1f}°   "
-                                        f"Pitch: {math.degrees(p):.1f}°   "
-                                        f"Yaw: {math.degrees(y):.1f}°   Accel: 9.81 m/s²")
+                # acceleration text
+                if (self.node.accel_world is not None) or (self.node.accel_body is not None):
+                    Ax, Ay, Az = (self.node.accel_world if self.node._imu_show_world else self.node.accel_body)
+                    Amag = self.node.accel_mag if (self.node.accel_mag is not None) else float('nan')
+                    frame_tag = "world" if self.node._imu_show_world else "body"
+                    gtag = " (gravity-comp)" if self.node._imu_gravity_comp and self.node._imu_show_world else ""
+                    self.lbl_imu.config(
+                        text=f"Roll: {math.degrees(r):.1f}°   Pitch: {math.degrees(p):.1f}°   Yaw: {math.degrees(y):.1f}°\n"
+                            f"a[{frame_tag}]{gtag}:  Ax={Ax:.2f}  Ay={Ay:.2f}  Az={Az:.2f}  |a|={Amag:.2f} m/s²"
+                    )
+                else:
+                    self.lbl_imu.config(
+                        text=f"Roll: {math.degrees(r):.1f}°   Pitch: {math.degrees(p):.1f}°   Yaw: {math.degrees(y):.1f}°\n"
+                            f"a: — m/s²"
+                    )
             else:
-                self.lbl_imu.config(text="Roll:    Pitch:    Yaw:     Accel: 9.81 m/s²")
+                self.lbl_imu.config(text="Roll:    Pitch:    Yaw:    \na: — m/s²")
+
 
             # Altitude progress bar
             max_alt = max(1.0, float(self.node.get_parameter('max_altitude').value))
