@@ -1,5 +1,5 @@
 """
-Before launching this file run with:
+Before launching this file with:
     python3 src/41068_ignition_bringup/main.py 
 
 In a seperate terminal run:
