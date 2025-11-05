@@ -16,12 +16,12 @@ import threading        # Used for Odometry operation
 import time             # Used for timers and delays                                
 import numpy as np      # Used for Hypotenous, Sin, Cos and Arctan^2 and Sign calculations
 
-from rclpy.executors                 import MultiThreadedExecutor 
-from drone_control.dronecontrolling  import DroneController   # Drone Control Access
-from path_planning.snake_path        import Goals             # Initial Waypoint List Access
-from drone_control.odometry_listener import OdometryListener  # Live Odometry Feed Access
-from lidar_processing.filtered_lidar import FilteredLidar
-from lidar_processing.tree_detector  import TreeDetection     # Used for Tree Detection
+from rclpy.executors                 import MultiThreadedExecutor # For managing all nodes
+from drone_control.dronecontrolling  import DroneController       # Drone Control Access
+from path_planning.snake_path        import Goals                 # Initial Waypoint List Access
+from drone_control.odometry_listener import OdometryListener      # Live Odometry Feed Access
+from lidar_processing.filtered_lidar import FilteredLidar         # For Collision Avoidance
+from lidar_processing.tree_detector  import TreeDetection         # Used for Tree Detection
 
 
 def wait_motion_finish(controller: DroneController, timeout=30.0):
