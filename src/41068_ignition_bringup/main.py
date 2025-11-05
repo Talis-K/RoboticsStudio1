@@ -11,21 +11,23 @@ In a seperate terminal run:
 Ensure all lines are run within the /RoboticsStudio1 directory in your bash terminal
 """
 
-import rclpy                                                 # Used for ROS 2 Communication
-import threading                                             # Used for Odometry operation
-import time
-import math                                                  # Used for timers and delays
-import numpy as np                                           # Used for Hypotenous and Sign calculations
+import rclpy            # Used for ROS 2 Communication
+import threading        # Used for Odometry operation
+import time             # Used for timers and delays                                
+import numpy as np      # Used for Hypotenous, Sin, Cos and Arctan^2 and Sign calculations
 
-from drone_control.dronecontrolling import DroneController   # Drone Control Access
-from path_planning.snake_path import Goals                   # Initial Waypoint List Access
-from drone_control.odometry_listener import OdometryListener # Live Odometry Feed Access
+from rclpy.executors                 import MultiThreadedExecutor 
+from drone_control.dronecontrolling  import DroneController   # Drone Control Access
+from path_planning.snake_path        import Goals             # Initial Waypoint List Access
+from drone_control.odometry_listener import OdometryListener  # Live Odometry Feed Access
 from lidar_processing.filtered_lidar import FilteredLidar
-from lidar_processing.tree_detector import TreeDetection
+from lidar_processing.tree_detector  import TreeDetection     # Used for Tree Detection
 
 
 def wait_motion_finish(controller: DroneController, timeout=30.0):
-    #/////////////////// CHECKS, SAFETY AND COMPLETION ////////////////////
+    """
+    /////////////////// CHECKS, SAFETY AND COMPLETION ////////////////////
+    """
     start = time.time() #Records current time to track elapsed duration.
     while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
 
@@ -36,90 +38,77 @@ def wait_motion_finish(controller: DroneController, timeout=30.0):
             return
     #----------------------------------------------------------------------
         time.sleep(0.01) # Small delay for computer processing
-    #//////////////////////////////////////////////////////////////////////
 
-def rotate(controller: DroneController, target, tolerance=0.03):
+def rotate(controller: DroneController, pose, dx, dy, tolerance=0.03):
     """
-    Rotate the drone to face the waypoint before approaching.
+    //////////////// ENSURES CORRECT YAW FOR WAYPOINT GOAL ////////////////
     """
 
-    while rclpy.ok():
-        pose = OdometryListener.update()
+    while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+        pose = OdometryListener.update() #Updates the live pose of the drone.
+    #--------------------- Small Wait if No Pose- -------------------------
         if pose is None:
             time.sleep(0.05)
             continue
+    #----------------------------------------------------------------------
+    #------------------------ Desired yaw error ---------------------------
 
-        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
-
-        dx = target[0] - pose[0]
-        dy = target[1] - pose[1]
-
-        # Desired yaw direction
-        desired_yaw = math.atan2(dy, dx)
-        yaw_error = math.atan2(math.sin(desired_yaw - pose[5]), math.cos(desired_yaw - pose[5]))
-
-        if abs(yaw_error) <= tolerance:
-            # print("[rotate] Orientation aligned.")
+        desired_yaw = np.arctan2(dy, dx)
+        yaw_error = np.arctan2(np.sin(desired_yaw - pose[5]), np.cos(desired_yaw - pose[5]))
+    #----------------------------------------------------------------------
+        if abs(yaw_error) <= tolerance: #When the yaw is approximately facing the correct direction exit function.
             return
 
-        # Proportional angular speed
-        angular_speed = max(0.01, min(0.5, abs(yaw_error)))
-        duration = abs(yaw_error) / angular_speed
-
-        # Command motion
-        controller.turn(math.copysign(angular_speed, yaw_error), duration)
-        controller.start()
-        wait_motion_finish(controller)
+    #-------------- Calculate the proportional angular speed ---------------
+        angular_speed = max(0.01, min(0.5, abs(yaw_error))) #Angular speed can be no smaller then 0.01 rad/s and no larger than 0.5 rad/s and will otherwise be the absolute yaw error
+        duration = abs(yaw_error) / angular_speed #The duration needed to reach the desired yaw and the angular speed is calculated 
+    #-----------------------------------------------------------------------
+    #--------------------- Command and queue motion ------------------------
+        controller.turn(np.sign(yaw_error) * angular_speed, duration) #Queuing turn
+        controller.start() #Checking motion is queued and executing turn
+        wait_motion_finish(controller) #Safety check and queue empty check
+    #-----------------------------------------------------------------------
 
 
 def move_to(controller: DroneController, target, tolerance=0.2, speed = 1.0):
     """
-    Move the drone toward the target (x, y) coordinate until within tolerance.
+    ///////////////// TRANSLATION & ROTATION TO WAYPOINT ///////////////////
     """
 
-    while rclpy.ok():
-        pose = OdometryListener.update()
-        if pose is None:
-            time.sleep(0.05)
-            continue
-
-        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
-
+    while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+        
+        pose = OdometryListener.update() #Updates the live pose of the drone.
+        
+    #-------------------- Error in x and y planes -------------------------
         dx = target[0] - pose[0]
         dy = target[1] - pose[1]
+    #----------------------------------------------------------------------
+    #------------------ Ensure Correct Yaw Orientation --------------------
+        rotate(controller, pose, dx, dy)
+    #----------------------------------------------------------------------
+        
+        distance = np.hypot(dx, dy) #XY Plane distance to target
+        if distance <= tolerance: #If within tolerance exit function
+            return
+        
+        if distance < 1.5: #Slow down near target to minimise overshooting
+            speed = distance/6 #Making speed proportional to distance when close to target
 
-        # Desired yaw direction
-        desired_yaw = math.atan2(dy, dx)
-        yaw_error = math.atan2(math.sin(desired_yaw - pose[5]), math.cos(desired_yaw - pose[5]))
+        duration = distance / speed/2 #Calculating duration so it
 
-        if abs(yaw_error) > 0.03:
-            rotate(controller, target)
-
-
-        distance = math.hypot(dx, dy)
-        print(distance)
-
-        if distance <= tolerance:
-            print(f"[approach] Target reached. current pose: [{pose[0]}, {pose[1]}]")
-            return True
-
-        # Slow down near goal (min speed 0.1, max 1.0)
-
-        if distance < 1.5:
-            speed = distance/6   
-        duration = distance / speed /2
-
-        controller.move_x(speed, duration)
-        controller.start()
-        wait_motion_finish(controller)
+        controller.move_x(speed, duration)  #Queue forward motion
+        controller.start() #Checking motion is queued and executing turn
+        wait_motion_finish(controller) #Safety check and queue empty check
         
 
 def main():
-    #/////////////////////////--- SET UP ---///////////////////////////////
+    """
+    ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
+    """
     # ----------------- Initialise ROS communication ----------------------
-    rclpy.init()
-    #----------------------------------------------------------------------
-    # -------------------------- Nodes ---------------------------------
+    rclpy.init() 
+    # ---------------------------------------------------------------------
+    # ---------------------------- Nodes ----------------------------------
     odom = OdometryListener()
     OdometryListener._instance = odom
 
@@ -129,19 +118,18 @@ def main():
 
     checker = TreeDetection()
 
-    # One executor handles both nodes
-    from rclpy.executors import MultiThreadedExecutor
-    executor = MultiThreadedExecutor(num_threads=4)
+    #---------------------- Executor for all nodes ------------------------
+    executor = MultiThreadedExecutor(num_threads=4) #Runs callbacks in a pool of threads
+    #----------------------------------------------------------------------
+    # ------------------------- List of Nodes------------------------------
     executor.add_node(odom)
     executor.add_node(controller)
     executor.add_node(filter)
     # executor.add_node(checker)
-
-
-    # Spin executor in background thread (safe)
+    #----------------------------------------------------------------------
+    #------------- Spin executor in background thread (safe) --------------
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
-
     # ---------------------------------------------------------------------
     # ------------------------ X Y Waypoints ------------------------------
     waypoints = [(p[0], p[1]) for p in Goals().position()]
@@ -150,18 +138,13 @@ def main():
     while OdometryListener.update() is None:
         time.sleep(0.1)
     #----------------------------------------------------------------------
-    # ---------------------- Start Drone Control --------------------------
-    #----------------------------------------------------------------------
-    #//////////////////////////////////////////////////////////////////////
-
-    #///////////////////////// MOVE TO WAYPOINTS //////////////////////////
+    #------------------------- Move to waypoints --------------------------
     try:
         for i, wp in enumerate(waypoints):
-            print(f"Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
+            print(f"[MAIN] Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
             move_to(controller, wp)
-    #//////////////////////////////////////////////////////////////////////
-
-    #/////////////////////// POST GOAL ACHIEVEMENT ////////////////////////
+    #----------------------------------------------------------------------
+    #--------------------- Post simulation processing ---------------------
     finally:
         if rclpy.ok():
             controller.stop()
@@ -169,7 +152,7 @@ def main():
             odom.destroy_node()
         rclpy.shutdown()
         print("[MAIN] Drone has finished survey.")
-    #//////////////////////////////////////////////////////////////////////
+    #----------------------------------------------------------------------
 
 
 if __name__ == '__main__':
