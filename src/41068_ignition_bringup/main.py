@@ -20,8 +20,7 @@ from rclpy.executors                 import MultiThreadedExecutor # For managing
 from drone_control.dronecontrolling  import DroneController       # Drone Control Access
 from path_planning.snake_path        import Goals                 # Initial Waypoint List Access
 from drone_control.odometry_listener import OdometryListener      # Live Odometry Feed Access
-from lidar_processing.filtered_lidar import FilteredLidar         # For Collision Avoidance
-from lidar_processing.tree_detector  import TreeDetection         # Used for Tree Detection
+from lidar_processing.all_lidar_processing import LidarDetection         # For Collision Avoidance
 
 
 def wait_motion_finish(controller: DroneController, timeout=30.0):
@@ -114,9 +113,7 @@ def main():
 
     controller = DroneController()
 
-    filter = FilteredLidar()
-
-    checker = TreeDetection()
+    lidar = LidarDetection()
 
     #---------------------- Executor for all nodes ------------------------
     executor = MultiThreadedExecutor(num_threads=4) #Runs callbacks in a pool of threads
@@ -124,8 +121,7 @@ def main():
     # ------------------------- List of Nodes------------------------------
     executor.add_node(odom)
     executor.add_node(controller)
-    executor.add_node(filter)
-    # executor.add_node(checker)
+    executor.add_node(lidar)
     #----------------------------------------------------------------------
     #------------- Spin executor in background thread (safe) --------------
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
@@ -143,6 +139,28 @@ def main():
         for i, wp in enumerate(waypoints):
             print(f"[MAIN] Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
             move_to(controller, wp)
+
+        print("\n--- Detetced Trees ---")
+        for i, tree in enumerate(lidar.Trees):
+            print(f"Tree {i}:")
+            print(f"  Centroid: {tree['centroid']}")
+            print(f"  Radius: {tree['radius']}")
+            print(f"  Num points: {len(tree['points'])}")
+            print(f"  Scan index: {tree['scan_index']}")
+
+        print("\n--- Detected People ---")
+        for i, person in enumerate(lidar.people):
+            print(f"Person {i}:")
+            print(f"  Centroid: {person['centroid']}")
+            print(f"  Radius {person['radius']}")
+            print(f"  Num points: {len(person['points'])}")
+            print(f"  Scan index: {person['scan_index']}")
+        
+        print("\n--- object avoidance ---")
+        for i, geometry in enumerate(lidar.geometries):
+            print(f"Geometry {i}:")
+            print(f"  Centroid: {geometry[0]:.2f}, {geometry[1]:.2f}")
+            print(f"  Radius {geometry[2]}")
     #----------------------------------------------------------------------
     #--------------------- Post simulation processing ---------------------
     finally:

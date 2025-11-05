@@ -111,13 +111,6 @@
       <pose>-2 0 0 0 0 0</pose>
     </include>
 
-<!-- Rock -->
-    <include>
-      <uri>model://rock1</uri>
-      <name>rock1</name>
-      <pose>3 2 0 0 0 0</pose>
-    </include>
-
   </world>
 </sdf>
 
