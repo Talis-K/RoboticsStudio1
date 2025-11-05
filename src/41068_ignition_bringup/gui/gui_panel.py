@@ -311,6 +311,22 @@ class GuiNode(Node):
         if mt:
             self.create_subscription(Float32MultiArray, mt, self.on_chainsaw_metrics, 10)
 
+        # initial GUI state = PAUSED until Start is pressed
+        self.mission_state = "PAUSED"
+
+        # get mission state from main (latched QoS so late joiners see last)
+        self.create_subscription(
+            String,
+            '/mission/state',
+            self._on_state,
+            QoSProfile(
+                depth=1,
+                history=HistoryPolicy.KEEP_LAST,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            )
+        )
+
 
     def _on_wp_idx(self, v):   self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
@@ -437,12 +453,19 @@ class GuiNode(Node):
         except Exception:
             pass
 
-    def _on_state(self, msg):
-        self.mission_state = msg.data.upper()
-        try:
-            self.card_heading.set(f"Mission: {self.mission_state}")
-        except:
-            pass
+    def _on_state(self, msg: String):
+        st = (msg.data or "").strip().upper()
+        self.mission_state = st
+
+        # Keep only *flags* here; never call GUI methods from the node.
+        if st == "E-STOP":
+            self._estop = True
+        elif st in ("RUNNING", "PAUSED", "IDLE", "STOPPED", "RTL", "LAND"):
+            # Clear local E-STOP flag when mission reports a non-estop state.
+            # (If you want a physical latch, remove this line and require Reset.)
+            self._estop = False
+
+
 
     def _on_progress(self, msg):
         self.mission_progress = msg.data
@@ -570,8 +593,8 @@ class GuiNode(Node):
 
     # ---- Callbacks ----
     def on_scan(self, msg: LaserScan):
-        if self._estop:
-            return
+        # if self._estop:
+        #     return
 
         # Drop out-of-order timestamps
         stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
@@ -920,7 +943,8 @@ class AppFigma:
                 image=self.icons.get("compass", 16), compound="left").pack(side="left", padx=10, pady=8)
 
         # Right: flight mode chip (dynamic)
-        self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
+        #self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
+        self._mode_chip = self._chip(ctl_hdr, "PAUSED", bg="#FFF6E6", fg="#9A6B00", hover_bg="#FFEBC7")
 
         # Body (your existing content)
         ctl_body = ttk.Frame(ctl, style="Card.TFrame", padding=(6, 8))
@@ -1284,16 +1308,28 @@ class AppFigma:
         self.node.engage_estop()
         self._set_estop_ui(True)
 
+    
+
     def on_estop_reset(self):
         self.node.reset_estop()
         self._set_estop_ui(False)
 
+  
+
     def _send_cmd(self, cmd: str):
         try:
             self.node.mission_cmd_pub.publish(String(data=cmd))
+            # optimistic local preview
+            if   cmd == "start":  self.node.mission_state = "RUNNING"
+            elif cmd == "pause":  self.node.mission_state = "PAUSED"
+            elif cmd == "resume": self.node.mission_state = "RUNNING"
+            elif cmd == "stop":   self.node.mission_state = "STOPPED"
+            elif cmd == "rtl":    self.node.mission_state = "RTL"
+            elif cmd == "land":   self.node.mission_state = "LAND"
             print(f"[GUI] Sent mission cmd: {cmd}")
         except Exception as e:
             print(f"[GUI] Failed to publish mission cmd: {e}")
+
 
 
     # ------------------------------ Pollers (kept, with extra label updates) ----
@@ -1346,7 +1382,7 @@ class AppFigma:
         try:
             # Top bar
             bp = self.node.battery_pct
-            self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: --%")
+            self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: 100%")
             self.lbl_rc.config(text="RC: Strong")
             self.lbl_utc.config(text=datetime.datetime.utcnow().strftime("UTC %H:%M:%S"))
 
@@ -1394,6 +1430,7 @@ class AppFigma:
                 wp_total = len(self.node.waypoints_xy) if self.node.waypoints_xy else 0
                 wp_done  = min(self.node.next_wp_idx, wp_total)
                 self._metric_set(self.card_waypts, f"{wp_done}/{wp_total}", "Completed")
+
 
 
             # --- Odometry / IMU / Altitude panels ---
@@ -1445,7 +1482,23 @@ class AppFigma:
                 self.alt_pb.configure(style="AltBar.Horizontal.TProgressbar")
 
             # Status line (use your counters if you added them; otherwise simple)
-            self.lbl_status.config(text=("Status: E-STOPPED" if self.node.estop_active() else "Status: RUNNING"))
+                        # Status line driven by /mission/state (fallbacks for safety)
+            state = (self.mission_state or "").upper()
+            if not state:
+                state = "PAUSED"  # default visual until we hear from main
+            self.lbl_status.config(text=f"Status: {state}")
+
+
+                        # Update chip style by state
+            if state == "RUNNING":
+                self._mode_chip.config(text="RUNNING", bg="#E9FFF6", fg="#156F4B")
+            elif state == "PAUSED":
+                self._mode_chip.config(text="PAUSED", bg="#FFF6E6", fg="#9A6B00")
+            elif state == "E-STOP":
+                self._mode_chip.config(text="E-STOP", bg="#FDECEC", fg="#E11900")
+            else:
+                self._mode_chip.config(text=state or "PAUSED", bg="#EEF1F6", fg="#304050")
+
 
         except Exception as e:
             # keep the loop alive; throttle spam

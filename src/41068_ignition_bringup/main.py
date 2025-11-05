@@ -148,6 +148,9 @@ class Mission(Node):
             controller.start()
             Mission.wait_motion_finish(controller)
 
+
+ 
+
 def main():
     """
     ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
@@ -321,6 +324,8 @@ def main():
             odom.destroy_node()
         rclpy.shutdown()
         print("[MAIN] Drone has finished survey.")
+
+
 
 if __name__ == '__main__':
     main()
