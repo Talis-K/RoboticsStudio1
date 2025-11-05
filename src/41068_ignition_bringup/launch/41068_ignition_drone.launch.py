@@ -6,6 +6,8 @@ from launch.substitutions import (Command, LaunchConfiguration,
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from launch.conditions import IfCondition
+
 
 
 def generate_launch_description():
@@ -88,6 +90,18 @@ def generate_launch_description():
     ld.add_action(DeclareLaunchArgument('temperature_topic', default_value='/temperature'))
     ld.add_action(DeclareLaunchArgument('altitude_mode', default_value='auto'))
     ld.add_action(DeclareLaunchArgument('altitude_topic', default_value='')) 
+    enable_audio_arg   = DeclareLaunchArgument('enable_audio', default_value='True')
+    audio_topic_arg    = DeclareLaunchArgument('audio_topic',  default_value='/microphone/audio')
+    audio_fs_arg       = DeclareLaunchArgument('audio_fs',     default_value='16000')
+    audio_block_arg    = DeclareLaunchArgument('audio_block',  default_value='2048')
+    audio_switch_arg   = DeclareLaunchArgument('audio_switch_period_s', default_value='5.0')
+    ld.add_action(enable_audio_arg)
+    ld.add_action(audio_topic_arg)
+    ld.add_action(audio_fs_arg)
+    ld.add_action(audio_block_arg)
+    ld.add_action(audio_switch_arg)
+
+
 
 
     # Load robot_description and start robot_state_publisher
@@ -210,5 +224,45 @@ def generate_launch_description():
         }]
     )
     ld.add_action(gui_node)
+
+
+    audio_node = Node(
+    package='41068_ignition_bringup',
+    executable='test_audio_publisher.py',
+    name='random_audio_pub',
+    output='screen',
+    parameters=[{
+        'topic': LaunchConfiguration('audio_topic'),
+        'fs':    LaunchConfiguration('audio_fs'),
+        'block': LaunchConfiguration('audio_block'),
+        'switch_period_s': LaunchConfiguration('audio_switch_period_s'),
+    }],
+    condition=IfCondition(LaunchConfiguration('enable_audio'))
+    )
+    ld.add_action(audio_node)
+
+
+    enable_mission_arg = DeclareLaunchArgument('enable_mission', default_value='True')
+    ld.add_action(enable_mission_arg)
+
+    mission_node = Node(
+        package='41068_ignition_bringup',
+        executable='main.py',
+        name='mission_runner',
+        output='screen',
+        parameters=[{
+            'estop_topic':        LaunchConfiguration('estop_topic'),
+            'cmd_topic':          '/mission/cmd',
+            'state_topic':        '/mission/state',
+            'wp_idx_topic':       '/mission/waypoint_index',
+            'wp_total_topic':     '/mission/waypoint_total',
+            'progress_topic':     '/mission/progress',
+        }],
+        condition=IfCondition(LaunchConfiguration('enable_mission'))
+    )
+    ld.add_action(mission_node)
+
+
+
 
     return ld

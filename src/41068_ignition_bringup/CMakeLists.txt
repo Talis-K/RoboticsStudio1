@@ -7,15 +7,15 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-find_package(ament_cmake_python REQUIRED) # lidar_processing
+find_package(ament_cmake_python REQUIRED) 
 find_package(ros_ign_interfaces REQUIRED)
 
-# Install the Python module subpackage (lidar_processing)
+# Install the Python module subpackage 
 ament_python_install_package(lidar_processing)
 ament_python_install_package(chainsaw_detector2)
 
 
-# Install executable scripts for lidar_processing
+# Install executable scripts 
 install(PROGRAMS
   lidar_processing/filtered_lidar.py
   lidar_processing/tree_detector.py
@@ -23,6 +23,7 @@ install(PROGRAMS
   drone_control/odometry_listener.py
   chainsaw_detector2/chainsaw_detector_node.py 
   chainsaw_detector2/test_audio_publisher.py
+  main.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -11,23 +11,63 @@ In a seperate terminal run:
 Ensure all lines are run within the /RoboticsStudio1 directory in your bash terminal
 """
 
-import rclpy                                                 # Used for ROS 2 Communication
-import threading                                             # Used for Odometry operation
-import time
-import math                                                  # Used for timers and delays
-import numpy as np                                           # Used for Hypotenous and Sign calculations
+import rclpy            # Used for ROS 2 Communication
+import threading        # Used for Odometry operation
+import time             # Used for timers and delays                                
+import numpy as np      # Used for Hypotenous, Sin, Cos and Arctan^2 and Sign calculations
 
-from drone_control.dronecontrolling import DroneController   # Drone Control Access
-from path_planning.snake_path import Goals                   # Initial Waypoint List Access
-from drone_control.odometry_listener import OdometryListener # Live Odometry Feed Access
-from lidar_processing.filtered_lidar import FilteredLidar
-from lidar_processing.tree_detector import TreeDetection
+from rclpy.executors                 import MultiThreadedExecutor # For managing all nodes
+from drone_control.dronecontrolling  import DroneController       # Drone Control Access
+from path_planning.snake_path        import Goals                 # Initial Waypoint List Access
+from drone_control.odometry_listener import OdometryListener      # Live Odometry Feed Access
+from lidar_processing.filtered_lidar import FilteredLidar         # For Collision Avoidance
+from lidar_processing.tree_detector  import TreeDetection         # Used for Tree Detection
+
+# NEW: mission/GUI messaging
+from std_msgs.msg import Int32
+from geometry_msgs.msg import PoseArray, Pose
+from nav_msgs.msg import Path
+from geometry_msgs.msg import PoseStamped
+from rclpy.qos import QoSProfile, QoSDurabilityPolicy, ReliabilityPolicy, HistoryPolicy
+from std_msgs.msg import Bool, String, Float32
+
+
+# --- Mission control flags (module-level so helpers can see them) ---
+estop_flag   = threading.Event()
+pause_flag   = threading.Event()
+started_flag = threading.Event()
+stop_flag    = threading.Event()
+
+
+transient_qos = QoSProfile(
+    reliability=ReliabilityPolicy.RELIABLE,
+    history=HistoryPolicy.KEEP_LAST,
+    depth=1,
+    durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,  # latch last message
+)
+
 
 
 def wait_motion_finish(controller: DroneController, timeout=30.0):
-    #/////////////////// CHECKS, SAFETY AND COMPLETION ////////////////////
+    """
+    /////////////////// CHECKS, SAFETY AND COMPLETION ////////////////////
+    """
     start = time.time() #Records current time to track elapsed duration.
     while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+
+
+            # ---- NEW: pause wait (do nothing while paused) ----
+        if pause_flag.is_set():
+            time.sleep(0.05)
+            continue
+
+            # ---- NEW: emergency stop bail-out ----
+        if estop_flag.is_set():
+                try:
+                    controller.stop()
+                except Exception:
+                    pass
+                return
 
     #---------------------Completion and Safety Check----------------------
         if not controller.motion_queue and controller.timer is None: #Motion is complete when: The motion queue is done and there's no active timer
@@ -36,132 +76,270 @@ def wait_motion_finish(controller: DroneController, timeout=30.0):
             return
     #----------------------------------------------------------------------
         time.sleep(0.01) # Small delay for computer processing
-    #//////////////////////////////////////////////////////////////////////
 
-def rotate(controller: DroneController, target, tolerance=0.03):
+def rotate(controller: DroneController, pose, dx, dy, tolerance=0.03):
     """
-    Rotate the drone to face the waypoint before approaching.
+    //////////////// ENSURES CORRECT YAW FOR WAYPOINT GOAL ////////////////
     """
 
-    while rclpy.ok():
-        pose = OdometryListener.update()
-        if pose is None:
+    while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+
+                # ---- NEW: pause wait ----
+        if pause_flag.is_set():
             time.sleep(0.05)
             continue
 
-        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
-
-        dx = target[0] - pose[0]
-        dy = target[1] - pose[1]
-
-        # Desired yaw direction
-        desired_yaw = math.atan2(dy, dx)
-        yaw_error = math.atan2(math.sin(desired_yaw - pose[5]), math.cos(desired_yaw - pose[5]))
-
-        if abs(yaw_error) <= tolerance:
-            # print("[rotate] Orientation aligned.")
+        # ---- NEW: emergency stop ----
+        if estop_flag.is_set():
             return
 
-        # Proportional angular speed
-        angular_speed = max(0.01, min(0.5, abs(yaw_error)))
-        duration = abs(yaw_error) / angular_speed
 
-        # Command motion
-        controller.turn(math.copysign(angular_speed, yaw_error), duration)
-        controller.start()
-        wait_motion_finish(controller)
+
+
+        pose = OdometryListener.update() #Updates the live pose of the drone.
+    #--------------------- Small Wait if No Pose- -------------------------
+        if pose is None:
+            time.sleep(0.05)
+            continue
+    #----------------------------------------------------------------------
+    #------------------------ Desired yaw error ---------------------------
+
+        desired_yaw = np.arctan2(dy, dx)
+        yaw_error = np.arctan2(np.sin(desired_yaw - pose[5]), np.cos(desired_yaw - pose[5]))
+    #----------------------------------------------------------------------
+        if abs(yaw_error) <= tolerance: #When the yaw is approximately facing the correct direction exit function.
+            return
+
+    #-------------- Calculate the proportional angular speed ---------------
+        angular_speed = max(0.01, min(0.5, abs(yaw_error))) #Angular speed can be no smaller then 0.01 rad/s and no larger than 0.5 rad/s and will otherwise be the absolute yaw error
+        duration = abs(yaw_error) / angular_speed #The duration needed to reach the desired yaw and the angular speed is calculated 
+    #-----------------------------------------------------------------------
+    #--------------------- Command and queue motion ------------------------
+        controller.turn(np.sign(yaw_error) * angular_speed, duration) #Queuing turn
+        controller.start() #Checking motion is queued and executing turn
+        wait_motion_finish(controller) #Safety check and queue empty check
+    #-----------------------------------------------------------------------
 
 
 def move_to(controller: DroneController, target, tolerance=0.2, speed = 1.0):
     """
-    Move the drone toward the target (x, y) coordinate until within tolerance.
+    ///////////////// TRANSLATION & ROTATION TO WAYPOINT ///////////////////
     """
 
-    while rclpy.ok():
-        pose = OdometryListener.update()
-        if pose is None:
+    while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+                # ---- NEW: pause wait ----
+        if pause_flag.is_set():
             time.sleep(0.05)
             continue
 
-        # print(f"Current pose: [{pose[0]},{pose[1]}], target pose: [{target[0]},{target[1]}]")
-
+        # ---- NEW: emergency stop ----
+        if estop_flag.is_set():
+            try:
+                controller.stop()
+            except Exception:
+                pass
+            return
+        
+        pose = OdometryListener.update() #Updates the live pose of the drone.
+        
+    #-------------------- Error in x and y planes -------------------------
         dx = target[0] - pose[0]
         dy = target[1] - pose[1]
+    #----------------------------------------------------------------------
+    #------------------ Ensure Correct Yaw Orientation --------------------
+        rotate(controller, pose, dx, dy)
+    #----------------------------------------------------------------------
+        
+        distance = np.hypot(dx, dy) #XY Plane distance to target
+        if distance <= tolerance: #If within tolerance exit function
+            return
+        
+        if distance < 1.5: #Slow down near target to minimise overshooting
+            speed = distance/6 #Making speed proportional to distance when close to target
 
-        # Desired yaw direction
-        desired_yaw = math.atan2(dy, dx)
-        yaw_error = math.atan2(math.sin(desired_yaw - pose[5]), math.cos(desired_yaw - pose[5]))
+        duration = distance / speed/2 #Calculating duration so it
 
-        if abs(yaw_error) > 0.03:
-            rotate(controller, target)
-
-
-        distance = math.hypot(dx, dy)
-        print(distance)
-
-        if distance <= tolerance:
-            print(f"[approach] Target reached. current pose: [{pose[0]}, {pose[1]}]")
-            return True
-
-        # Slow down near goal (min speed 0.1, max 1.0)
-
-        if distance < 1.5:
-            speed = distance/6   
-        duration = distance / speed /2
-
-        controller.move_x(speed, duration)
-        controller.start()
-        wait_motion_finish(controller)
+        controller.move_x(speed, duration)  #Queue forward motion
+        controller.start() #Checking motion is queued and executing turn
+        wait_motion_finish(controller) #Safety check and queue empty check
         
 
 def main():
-    #/////////////////////////--- SET UP ---///////////////////////////////
+    """
+    ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
+    """
     # ----------------- Initialise ROS communication ----------------------
-    rclpy.init()
-    #----------------------------------------------------------------------
-    # -------------------------- Nodes ---------------------------------
+    rclpy.init() 
+    # ---------------------------------------------------------------------
+    # ---------------------------- Nodes ----------------------------------
     odom = OdometryListener()
     OdometryListener._instance = odom
 
     controller = DroneController()
 
+    # Make mission/GUI publishers durable so late-joiners (GUI) get the last values
+    transient_qos = QoSProfile(
+        depth=1,
+        history=HistoryPolicy.KEEP_LAST,
+        reliability=ReliabilityPolicy.RELIABLE,
+        durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+    )
+
+    pub_wp_total = controller.create_publisher(Int32, '/mission/waypoint_total', transient_qos)
+    pub_wp_idx   = controller.create_publisher(Int32, '/mission/waypoint_index', transient_qos)
+    pub_wp_array = controller.create_publisher(PoseArray, '/mission/waypoints', transient_qos)
+    pub_wp_path  = controller.create_publisher(Path, '/mission/waypoints_path', transient_qos)
+
+
+        # Mission state flags (thread-safe)
+    for ev in (estop_flag, pause_flag, started_flag, stop_flag):
+        ev.clear()
+
+    # Durable (latched) state so GUI late-joiners see last status
+    pub_state = controller.create_publisher(String, '/mission/state', transient_qos)
+    pub_prog  = controller.create_publisher(Float32, '/mission/progress', 10)
+
+    # E-STOP subscriber
+    def _on_estop(msg: Bool):
+        if bool(msg.data):
+            estop_flag.set()
+            pause_flag.clear()
+            pub_state.publish(String(data='E-STOP'))
+            try:
+                controller.stop()
+            except Exception:
+                pass
+        else:
+            estop_flag.clear()
+            pub_state.publish(String(data='IDLE'))
+    controller.create_subscription(Bool, '/e_stop', _on_estop, 10)
+
+    # Mission command subscriber
+    def _on_cmd(msg: String):
+        cmd = (msg.data or '').strip().lower()
+        if cmd == 'start':
+            stop_flag.clear()
+            pause_flag.clear()
+            started_flag.set()
+            pub_state.publish(String(data='RUNNING'))
+        elif cmd == 'stop':
+            stop_flag.set()
+            pause_flag.clear()
+            pub_state.publish(String(data='STOPPED'))
+            try:
+                controller.stop()
+            except Exception:
+                pass
+        elif cmd == 'pause':
+            pause_flag.set()
+            pub_state.publish(String(data='PAUSED'))
+            try:
+                controller.stop()
+            except Exception:
+                pass
+        elif cmd == 'resume':
+            pause_flag.clear()
+            started_flag.set()
+            pub_state.publish(String(data='RUNNING'))
+        elif cmd == 'rtl':
+            # TODO hook your RTL here (optional)
+            pub_state.publish(String(data='RTL'))
+        elif cmd == 'land':
+            # TODO hook your LAND here (optional)
+            pub_state.publish(String(data='LAND'))
+    controller.create_subscription(String, '/mission/cmd', _on_cmd, 10)
+
+    # Initial state
+    pub_state.publish(String(data='IDLE'))
+
+
+
     filter = FilteredLidar()
 
     checker = TreeDetection()
 
-    # One executor handles both nodes
-    from rclpy.executors import MultiThreadedExecutor
-    executor = MultiThreadedExecutor(num_threads=4)
+    #---------------------- Executor for all nodes ------------------------
+    executor = MultiThreadedExecutor(num_threads=4) #Runs callbacks in a pool of threads
+    #----------------------------------------------------------------------
+    # ------------------------- List of Nodes------------------------------
     executor.add_node(odom)
     executor.add_node(controller)
     executor.add_node(filter)
     # executor.add_node(checker)
-
-
-    # Spin executor in background thread (safe)
+    #----------------------------------------------------------------------
+    #------------- Spin executor in background thread (safe) --------------
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
     spin_thread.start()
-
     # ---------------------------------------------------------------------
     # ------------------------ X Y Waypoints ------------------------------
     waypoints = [(p[0], p[1]) for p in Goals().position()]
+
+        # NEW: publish full waypoint set for GUI (PoseArray + Path)
+    wp_array = PoseArray()
+    wp_array.header.frame_id = 'odom'
+    wp_array.header.stamp = controller.get_clock().now().to_msg()
+
+    wp_path  = Path()
+    wp_path.header.frame_id = 'odom'
+    wp_path.header.stamp = controller.get_clock().now().to_msg()
+    
+    
+
+    for (x, y) in waypoints:
+        ps = Pose()
+        ps.position.x = float(x)
+        ps.position.y = float(y)
+        ps.position.z = 0.0
+        wp_array.poses.append(ps)
+
+        ps_stamped = PoseStamped()
+        ps_stamped.header.frame_id = 'odom'
+        ps_stamped.header.stamp = controller.get_clock().now().to_msg()
+        ps_stamped.pose = ps
+        wp_path.poses.append(ps_stamped)
+
+    pub_wp_array.publish(wp_array)
+    pub_wp_path.publish(wp_path)
+
+    # NEW: publish total waypoint count once
+    from std_msgs.msg import Int32 as _Int32Alias  # avoid shadowing, keeps clarity
+    pub_wp_total.publish(_Int32Alias(data=len(waypoints)))
+
     # ---------------------------------------------------------------------
     # --------------------- Wait for Initial Pose -------------------------
     while OdometryListener.update() is None:
         time.sleep(0.1)
     #----------------------------------------------------------------------
-    # ---------------------- Start Drone Control --------------------------
-    #----------------------------------------------------------------------
-    #//////////////////////////////////////////////////////////////////////
-
-    #///////////////////////// MOVE TO WAYPOINTS //////////////////////////
+    #------------------------- Move to waypoints --------------------------
     try:
-        for i, wp in enumerate(waypoints):
-            print(f"Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
-            move_to(controller, wp)
-    #//////////////////////////////////////////////////////////////////////
+        # Wait here until user presses "Start" in the GUI
+        if not started_flag.is_set():
+            pub_state.publish(String(data='IDLE'))
+        while rclpy.ok() and (not started_flag.is_set()) and (not stop_flag.is_set()):
+            time.sleep(0.05)
 
-    #/////////////////////// POST GOAL ACHIEVEMENT ////////////////////////
+        total = len(waypoints)
+        for i, wp in enumerate(waypoints):
+            if stop_flag.is_set():
+                break
+            if estop_flag.is_set():
+                break
+
+            # progress before moving this leg
+            if total > 0:
+                pub_prog.publish(Float32(data=float(i) / float(total)))
+
+            pub_wp_idx.publish(_Int32Alias(data=i + 1))  # 1..N for GUI
+            print(f"[MAIN] Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
+            move_to(controller, wp)
+
+        # final progress = 100%
+        if total > 0:
+            pub_prog.publish(Float32(data=1.0))
+        pub_state.publish(String(data='IDLE' if not estop_flag.is_set() else 'E-STOP'))
+
+    #----------------------------------------------------------------------
+    #--------------------- Post simulation processing ---------------------
     finally:
         if rclpy.ok():
             controller.stop()
@@ -169,7 +347,7 @@ def main():
             odom.destroy_node()
         rclpy.shutdown()
         print("[MAIN] Drone has finished survey.")
-    #//////////////////////////////////////////////////////////////////////
+    #----------------------------------------------------------------------
 
 
 if __name__ == '__main__':
