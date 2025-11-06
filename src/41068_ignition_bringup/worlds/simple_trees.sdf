@@ -120,6 +120,11 @@
       <name>human3</name>
       <pose>4 -5 0 0 0 2.0</pose>
     </include>
+    <include>
+    <uri>../models/tree_stump</uri>
+      <name>tree_stump</name>
+      <pose>-2 -2 0 1.5708 0 0</pose>
+    </include>
 
   </world>
 </sdf>

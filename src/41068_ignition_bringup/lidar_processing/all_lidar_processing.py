@@ -32,12 +32,12 @@ class LidarDetection(Node):
 
 
         #Paramters for Tree Stump
-        self.stump_radius_min = 0.12   # m  (small posts/rocks will be < this)
-        self.stump_radius_max = 0.45   # m  (most trunk cut stumps < 0.45)
-        self.stump_min_points = 12     # tighter than generic cluster to ensure shape quality
-        self.stump_max_mean_resid = 0.03  # m, mean absolute residual from circle fit
-        self.stump_max_std_resid  = 0.025 # m, residual std dev
-        self.stump_min_roundness  = 0.75  # unitless, 1.0 is perfectly round
+        self.stump_radius_min = 0.10   # m  (small posts/rocks will be < this)
+        self.stump_radius_max = 0.9   # m  (most trunk cut stumps < 0.45)
+        self.stump_min_points = 10     # tighter than generic cluster to ensure shape quality
+        self.stump_max_mean_resid = 0.055  # m, mean absolute residual from circle fit
+        self.stump_max_std_resid  = 0.055 # m, residual std dev
+        self.stump_min_roundness  = 0.2  # unitless, 1.0 is perfectly round
 
         # Odometry
         self.current_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0} # initial odom with zeros
@@ -408,6 +408,21 @@ class LidarDetection(Node):
         return True
 
 
+    def _is_stump_by_extent(self, tree):
+        pts = tree['points']
+        if len(pts) < self.stump_min_points:
+            return False
+
+        # Bounding box in XY plane
+        minx, maxx = np.min(pts[:,0]), np.max(pts[:,0])
+        miny, maxy = np.min(pts[:,1]), np.max(pts[:,1])
+
+        width = maxx - minx
+        height = maxy - miny
+        diameter_est = max(width, height)
+
+        # Treat stump if footprint is within expected range
+        return (self.stump_radius_min*2 <= diameter_est <= self.stump_radius_max*2)
 
 
 

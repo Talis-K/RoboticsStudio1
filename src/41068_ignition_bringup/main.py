@@ -211,6 +211,8 @@ def main():
 
     pub_tree_count   = controller.create_publisher(Int32, '/mission/tree_count', transient_qos)
     pub_people_count = controller.create_publisher(Int32, '/mission/people_count', transient_qos)
+    pub_stump_count = controller.create_publisher(Int32, '/mission/stump_count', transient_qos)
+
     # geometry can be live (no need to be transient)
     pub_avoid_geom   = controller.create_publisher(Float32MultiArray, '/mission/avoidance_object', 10)
 
@@ -286,7 +288,7 @@ def main():
     #----------------------------------------------------------------------
 
         # ---------------- Audio / Frequency detection subscribers --------------
-    # NEW: String classifier (e.g., "class=chainsaw conf=0.87 ...")
+    # String classifier (e.g., "class=chainsaw conf=0.87 ...")
     def _on_chainsaw_status(msg: String):
         s = (msg.data or '').lower()
         if 'chainsaw' in s:
@@ -294,7 +296,7 @@ def main():
 
     controller.create_subscription(String, '/audio/chainsaw/status', _on_chainsaw_status, 10)
 
-    # NEW: Simple boolean trigger (True => detected)
+    # Simple boolean trigger (True => detected)
     def _on_chainsaw_bool(msg: Bool):
         if bool(msg.data):
             _trigger_timed_hold(_auto_hold_secs, reason='sound')
@@ -343,6 +345,12 @@ def main():
     def _on_people_count(msg: Int32):
         pub_people_count.publish(Int32(data=msg.data))
     controller.create_subscription(Int32, '/people_count', _on_people_count, 10)
+
+    def _on_stump_count(msg: Int32):
+        pub_stump_count.publish(Int32(data=msg.data))
+    controller.create_subscription(Int32, '/stump_count', _on_stump_count, 10)
+
+
 
     def _on_obj_geom(msg: Float32MultiArray):
         # Each message is [cx, cy, r]; forward to GUI/live avoidance topic

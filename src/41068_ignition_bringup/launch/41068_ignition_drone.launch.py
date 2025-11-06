@@ -102,8 +102,9 @@ def generate_launch_description():
     ld.add_action(audio_switch_arg)
     ld.add_action(DeclareLaunchArgument('waypoints_path_topic', default_value='/mission/waypoints_path'))
     ld.add_action(DeclareLaunchArgument('waypoints_array_topic', default_value='/mission/waypoints'))
-    stumps_topic_arg = DeclareLaunchArgument('stumps_topic', default_value='/stumps')
-    ld.add_action(stumps_topic_arg)
+    stump_count_topic_arg = DeclareLaunchArgument('stump_count_topic', default_value='/mission/stump_count')
+    ld.add_action(stump_count_topic_arg)
+
 
    
     mission_cmd_topic_arg = DeclareLaunchArgument(
@@ -244,7 +245,8 @@ def generate_launch_description():
             'mission_cmd_topic':  LaunchConfiguration('mission_cmd_topic'),
             'tree_count_topic':   LaunchConfiguration('tree_count_topic'),
             'people_count_topic': LaunchConfiguration('people_count_topic'),
-            'stumps_topic': LaunchConfiguration('stumps_topic'),
+            'stump_count_topic': LaunchConfiguration('stump_count_topic'),
+
 
 
 

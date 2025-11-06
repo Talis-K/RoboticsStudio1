@@ -82,9 +82,10 @@ class GuiNode(Node):
 
         self.declare_parameter('tree_count_topic',   '/mission/tree_count')
         self.declare_parameter('people_count_topic', '/mission/people_count')
+        
 
      
-
+        self.declare_parameter('stump_count_topic', '/mission/stump_count')
         self.declare_parameter('detections_topic', '/trees/cut')
 
         #Audio Detetction
@@ -114,18 +115,21 @@ class GuiNode(Node):
 
         self.tree_count: int   = 0
         self.people_count: int = 0
+        self.stump_count: int   = 0
 
         tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
         pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
-        # --- Stumps (Float32MultiArray: [x, y, r, h_lb]) ---
-        self.declare_parameter('stumps_topic', '/stumps')
-        self.stumps: List[Tuple[float, float, float, float]] = []  # (x, y, r, h_lb)
+        sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
+
+
 
 
         if tct:
             self.create_subscription(Int32, tct, lambda m: setattr(self, 'tree_count', int(m.data)), qos_transient)
         if pct:
             self.create_subscription(Int32, pct, lambda m: setattr(self, 'people_count', int(m.data)), qos_transient)
+        if sct:
+            self.create_subscription(Int32, sct, lambda m: setattr(self, 'stump_count', int(m.data)), qos_transient)
 
 
         # Subscriptions
@@ -239,6 +243,8 @@ class GuiNode(Node):
         self.declare_parameter('chainsaw_high_hz',400.0)
         self.declare_parameter('audio_conf_thresh', 0.55)
         self.declare_parameter('audio_decision_window', 5)
+
+        
         # Waypoints
         self.declare_parameter('waypoints_path_topic',  '/mission/waypoints_path')
         self.declare_parameter('waypoints_array_topic', '/mission/waypoints')
@@ -318,9 +324,6 @@ class GuiNode(Node):
         if tpc:
             self.create_subscription(Temperature, tpc, self.on_temperature, 10)
 
-        stumps_t = self.get_parameter('stumps_topic').get_parameter_value().string_value
-        if stumps_t:
-            self.create_subscription(Float32MultiArray, stumps_t, self.on_stumps, 10)
 
 
 
