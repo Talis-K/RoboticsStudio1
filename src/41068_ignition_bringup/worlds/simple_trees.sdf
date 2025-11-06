@@ -127,8 +127,8 @@
     </include>
     <include>
     <uri>../models/tree_stump</uri>
-      <name>tree_stump</name>
-      <pose>-4.5 4.0 0 1.5708 0 0</pose>
+      <name>tree_stump2</name>
+      <pose>1.0 3.0 0 1.5708 0 0</pose>
     </include>
 
   </world>
