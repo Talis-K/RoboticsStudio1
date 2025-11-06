@@ -117,6 +117,10 @@ class GuiNode(Node):
 
         tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
         pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
+        # --- Stumps (Float32MultiArray: [x, y, r, h_lb]) ---
+        self.declare_parameter('stumps_topic', '/stumps')
+        self.stumps: List[Tuple[float, float, float, float]] = []  # (x, y, r, h_lb)
+
 
         if tct:
             self.create_subscription(Int32, tct, lambda m: setattr(self, 'tree_count', int(m.data)), qos_transient)
@@ -314,6 +318,12 @@ class GuiNode(Node):
         if tpc:
             self.create_subscription(Temperature, tpc, self.on_temperature, 10)
 
+        stumps_t = self.get_parameter('stumps_topic').get_parameter_value().string_value
+        if stumps_t:
+            self.create_subscription(Float32MultiArray, stumps_t, self.on_stumps, 10)
+
+
+
 
         dt = self.get_parameter('detections_topic').get_parameter_value().string_value
         if dt:
@@ -344,6 +354,21 @@ class GuiNode(Node):
             )
         )
 
+    def on_stumps(self, msg: Float32MultiArray):
+        """
+        Accepts a single stump per message: [x, y, r, h_lb].
+        If you publish batches, loop over chunks of 4 before appending.
+        """
+        try:
+            data = list(msg.data)
+            if len(data) >= 4:
+                x, y, r, h = map(float, data[:4])
+                self.stumps.append((x, y, r, h))
+                # keep memory bounded
+                if len(self.stumps) > 500:
+                    self.stumps = self.stumps[-500:]
+        except Exception:
+            pass
 
     def _on_wp_idx(self, v):   self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
@@ -1191,6 +1216,8 @@ class AppFigma:
         style.configure('.', background=bg, foreground=fg, font=("SF Pro Text", 11))
         style.configure('Bg.TFrame', background=bg)
         style.configure('Topbar.TFrame', background=card)
+        style.configure('MutedSmall.TLabel',
+    background=card, foreground=muted, font=("SF Pro Text", 9))
         style.configure('Card.TFrame', background=card)
         style.configure('Card.TLabelframe', background=card, relief='solid', borderwidth=1)
         style.configure('Card.TLabelframe.Label', background=card, foreground=muted, font=("SF Pro Text", 10, 'bold'))
@@ -1259,7 +1286,7 @@ class AppFigma:
         return frame
 
     def _metric_card(self, parent, title, value, sub, idx, icon=None):
-        card = ttk.Labelframe(parent, text=title, padding=(12,8), style="Card.TLabelframe")
+        card = ttk.Labelframe(parent, text=title, padding=(12,8, 6, 0), style="Card.TLabelframe")
         card.grid(row=0, column=idx, sticky="nsew", padx=8, pady=(4,8))
         parent.grid_columnconfigure(idx, weight=1)
 
@@ -1275,8 +1302,15 @@ class AppFigma:
         card.val_lbl = ttk.Label(card, text=value, style="MetricValue.TLabel")
         card.sub_lbl = ttk.Label(card, text=sub,   style="MetricSub.TLabel")
         card.val_lbl.pack(anchor="w", pady=(2,0))
-        card.sub_lbl.pack(anchor="w")
+        card.sub_lbl.pack(anchor="w", pady=(0, 6))
         return card
+    def _add_footer_counter(self, card, var: tk.StringVar):
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)  # was y=-8; either is fine now
+        card.footer_people_lbl = lbl
+
+
+       
 
 
     def _pill(self, parent, text, color, cb, payload, outline=False, icon=None):
@@ -1306,12 +1340,7 @@ class AppFigma:
     def _safe_has(self, name: str) -> bool:
         return hasattr(self, name) and getattr(self, name) is not None
 
-    def _add_footer_counter(self, card, var: tk.StringVar):
-        # A muted, small label stuck to bottom-right of the card
-        lbl = ttk.Label(card, textvariable=var, style="Muted.TLabel")
-        # Use place so it stays in the corner regardless of card content
-        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)
-        card.footer_people_lbl = lbl  # keep a ref if you need further tweaks
+  
 
 
     def _mini_stat(self, parent, title, value, icon=None):
@@ -1415,15 +1444,41 @@ class AppFigma:
             # --- Metric cards you actually have: tree, audio, speed, home, time, waypts ---
 
             # Tree count (from PoseArray of detections)
-            trees_via_topic = getattr(self.node, 'tree_count', 0)
-            if trees_via_topic > 0:
-                self._metric_set(self.card_tree, str(trees_via_topic), "Detected Trees")
+            # --- Trees (prefer count topic, else fallback to positions) ---
+            trees_via_topic = getattr(self.node, 'tree_count', None)
+            if isinstance(trees_via_topic, (int, float)) and trees_via_topic >= 0:
+                self._metric_set(self.card_tree, str(int(trees_via_topic)), "Detected Trees")
             else:
-                trees = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
+                trees = len(self.node.tree_positions_xy) if getattr(self.node, 'tree_positions_xy', None) else 0
                 self._metric_set(self.card_tree, str(trees), "Detected Trees")
 
-            people = int(getattr(self.node, 'people_count', 0))
-            self.tree_people_var.set(f"People: {people}")
+            # --- People (prefer count topic, else fallback to any stored positions list if you have one) ---
+            people = getattr(self.node, 'people_count', None)
+            if people is None:
+                people = len(getattr(self.node, 'people_positions_xy', []))  # safe if you don't have it
+            people = int(people)
+
+            # --- Stumps (prefer count topic, else fallback to local stumps list) ---
+            stumps_via_topic = getattr(self.node, 'stump_count', None)  # create this topic later if you like
+            if isinstance(stumps_via_topic, (int, float)) and stumps_via_topic >= 0:
+                stumps = int(stumps_via_topic)
+            else:
+                stumps = len(getattr(self.node, 'stumps', []))
+
+            # Optional: average stump height label if you’re publishing [x,y,r,h] and keeping self.node.stumps
+            avg_h = None
+            try:
+                if stumps and getattr(self.node, 'stumps', None):
+                    avg_h = sum(h for (_, _, _, h) in self.node.stumps) / len(self.node.stumps)
+            except Exception:
+                avg_h = None
+
+            # --- Footer text on the Tree card ---
+            footer = f"People: {people}| Stumps: {stumps}"
+            if avg_h is not None:
+                footer += f"  (avg h≈{avg_h:.2f} m)"
+            self.tree_people_var.set(footer)
+
 
 
             # Audio / chainsaw detector

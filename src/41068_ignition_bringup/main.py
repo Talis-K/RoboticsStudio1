@@ -32,12 +32,16 @@ from geometry_msgs.msg import PoseArray, Pose, PoseStamped
 from nav_msgs.msg import Path
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, ReliabilityPolicy, HistoryPolicy
 
+import threading
+import time
+
 #------ Mission control flags -------
 #Module-level so helpers can see them
 estop_flag   = threading.Event()
 pause_flag   = threading.Event()
 started_flag = threading.Event()
 stop_flag    = threading.Event()
+hold_flag    = threading.Event()      # when set, all motion loops hard-stop & wait
 #------------------------------------
 
 #------ Durable QoS for GUI state/waypoints ---------
@@ -67,6 +71,16 @@ class Mission(Node):
                     pass
                 return
         #----------------------------------------------------------------------
+
+        #---------------------- Sound HOLD engaged check ----------------------
+            if hold_flag.is_set():   # NEW: silently hold here while motors are stopped
+                try:
+                    controller.stop()
+                except Exception:
+                    pass
+                time.sleep(0.05)
+                continue
+        #----------------------------------------------------------------------
         #---------------------Completion and Safety Check----------------------
             if not controller.motion_queue and controller.timer is None: #Motion is complete when: The motion queue is done and there's no active timer
                 return
@@ -81,6 +95,16 @@ class Mission(Node):
         while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
         #---------------------- GUI Pause engaged check -----------------------
             if pause_flag.is_set():
+                time.sleep(0.05)
+                continue
+        #----------------------------------------------------------------------
+
+        #---------------------- Sound HOLD engaged check ----------------------
+            if hold_flag.is_set():   # NEW: fully stopped during HOLD
+                try:
+                    controller.stop()
+                except Exception:
+                    pass
                 time.sleep(0.05)
                 continue
         #----------------------------------------------------------------------
@@ -126,6 +150,16 @@ class Mission(Node):
                 except Exception:
                     pass
                 return
+        #----------------------------------------------------------------------
+
+        #-------------------- Sound HOLD engaged check ----------------------
+            if hold_flag.is_set():   # NEW: fully stopped during HOLD
+                try:
+                    controller.stop()
+                except Exception:
+                    pass
+                time.sleep(0.05)
+                continue
         #----------------------------------------------------------------------
             pose = OdometryListener.update() #Updates the live pose of the drone.
         #--------------------- Small Wait if No Pose- -------------------------
@@ -187,6 +221,54 @@ def main():
     pub_state = controller.create_publisher(String,  '/mission/state', transient_qos)
     pub_prog  = controller.create_publisher(Float32, '/mission/progress', 10)
 
+
+        # NEW: --- Sound-triggered full-stop (no GUI pause) ---
+    _hold_lock = threading.Lock()      # prevent overlapping holds
+    _hold_timer = None                 # threading.Timer for auto-resume
+    _last_hold_ts = 0.0                # debounce timestamp (epoch)
+    _hold_cooldown = 3.0               # ignore re-triggers within 3 s
+    _auto_hold_secs = 5.0              # stop duration on sound
+
+
+    
+
+    def _trigger_timed_hold(seconds: float, reason: str = "sound"):
+        """NEW: Immediately stop motors, set an internal hold for `seconds`, then auto-resume."""
+        nonlocal _hold_timer, _last_hold_ts
+        with _hold_lock:
+            now = time.time()
+            if now - _last_hold_ts < _hold_cooldown:
+                return  # debounce multiple detections
+            _last_hold_ts = now
+
+            # Engage hold
+            hold_flag.set()                                # (loops will respect this)
+            try:
+                controller.stop()                          # publish zero Twist right away
+            except Exception:
+                pass
+
+            # Reset/arm the one-shot resume timer
+            if _hold_timer is not None:
+                try:
+                    _hold_timer.cancel()
+                except Exception:
+                    pass
+            _hold_timer = threading.Timer(seconds, _clear_hold)
+            _hold_timer.daemon = True
+            _hold_timer.start()
+
+    def _clear_hold():
+        """NEW: Clear hold and let loops proceed (if not E-STOP)."""
+        nonlocal _hold_timer
+        with _hold_lock:
+            _hold_timer = None
+            if estop_flag.is_set():
+                # If an E-STOP happened during hold, remain stopped.
+                return
+            hold_flag.clear()          # loops will continue on next iteration
+
+
     #----------------------- E-STOP subscriber ----------------------------
     def _on_estop(msg: Bool):
         if bool(msg.data):
@@ -202,6 +284,24 @@ def main():
             pub_state.publish(String(data='IDLE'))
     controller.create_subscription(Bool, '/e_stop', _on_estop, 10)
     #----------------------------------------------------------------------
+
+        # ---------------- Audio / Frequency detection subscribers --------------
+    # NEW: String classifier (e.g., "class=chainsaw conf=0.87 ...")
+    def _on_chainsaw_status(msg: String):
+        s = (msg.data or '').lower()
+        if 'chainsaw' in s:
+            _trigger_timed_hold(_auto_hold_secs, reason='sound')
+
+    controller.create_subscription(String, '/audio/chainsaw/status', _on_chainsaw_status, 10)
+
+    # NEW: Simple boolean trigger (True => detected)
+    def _on_chainsaw_bool(msg: Bool):
+        if bool(msg.data):
+            _trigger_timed_hold(_auto_hold_secs, reason='sound')
+
+    controller.create_subscription(Bool, '/chainsaw_detected', _on_chainsaw_bool, 10)
+    # ----------------------------------------------------------------------
+
 
     #------------------ Mission command subscriber ------------------------
     def _on_cmd(msg: String):
@@ -314,7 +414,7 @@ def main():
                 break
 
             # Safety hold: if paused or E-STOP, wait here without advancing i
-            while rclpy.ok() and (pause_flag.is_set() or estop_flag.is_set()):
+            while rclpy.ok() and (pause_flag.is_set() or estop_flag.is_set() or hold_flag.is_set()):
                 # ensure motors are stopped while held
                 try:
                     controller.stop()
@@ -339,6 +439,8 @@ def main():
         if total > 0:
             pub_prog.publish(Float32(data=1.0))
         pub_state.publish(String(data='IDLE' if not estop_flag.is_set() else 'E-STOP'))
+
+        
     #----------------------------------------------------------------------
     #--------------------- Post simulation processing ---------------------
     finally:
