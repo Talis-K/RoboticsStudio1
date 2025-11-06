@@ -19,6 +19,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from rclpy.duration import Duration
+from rclpy.time import Time
+
 
 from PIL import Image as PILImage
 from PIL import ImageTk
@@ -667,15 +669,18 @@ class GuiNode(Node):
             ang += msg.angle_increment
 
         # Transform to odom
-        src_frame = msg.header.frame_id or 'laser'
+        src_frame   = msg.header.frame_id or 'laser'
         target_frame = 'odom'
+        world = False
         try:
+            # Use latest transform instead of exact stamp to avoid extrapolation at takeoff
             tfm = self.tf_buffer.lookup_transform(
-                target_frame, src_frame, msg.header.stamp, timeout=Duration(seconds=0.05)
+                target_frame, src_frame, Time(),  # latest available
+                timeout=Duration(seconds=0.25)    # give TF a bit more room
             )
             tx = tfm.transform.translation.x
             ty = tfm.transform.translation.y
-            q = tfm.transform.rotation
+            q  = tfm.transform.rotation
             yaw = _yaw_from_quat(q.x, q.y, q.z, q.w)
             cos_y, sin_y = math.cos(yaw), math.sin(yaw)
 
@@ -686,17 +691,21 @@ class GuiNode(Node):
                 pts_world.append((X, Y))
             pts = pts_world
             frame_used = target_frame
+            world = True
         except (LookupException, ConnectivityException, ExtrapolationException):
+            # stay in sensor frame; we’ll draw with dynamic bounds
             frame_used = src_frame
-
+            world = False
         try:
             self.msg_queue.put({
                 'src': 'scan',
                 'stamp': f"{msg.header.stamp.sec}.{str(msg.header.stamp.nanosec).zfill(9)}",
                 'frame': frame_used,
                 'n_total': len(pts),
-                'points_xy': pts
+                'points_xy': pts,
+                'world': world, 
             }, block=False)
+
         except queue.Full:
             pass
 
@@ -1446,11 +1455,13 @@ class AppFigma:
             self.redraw_scatter(
                 pts,
                 clusters,
-                src=item.get('src', ''),
-                frame=item.get('frame', ''),
-                stamp=item.get('stamp', ''),
-                n=item.get('n_total', '')
+                src=item.get('src',''),
+                frame=item.get('frame',''),
+                stamp=item.get('stamp',''),
+                n=item.get('n_total',''),
+                world=item.get('world', True)  # NEW
             )
+
         self.root.after(40, self.poll_scan)
 
     def _add_inline_right_of_value(self, card, var: tk.StringVar):
@@ -1508,7 +1519,7 @@ class AppFigma:
             self.tree_people_var.set(footer)
             legal  = getattr(self.node, 'legal_cuts', 0)
             illegal = getattr(self.node, 'illegal_cuts', 0)
-            self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(illegal)}")
+            self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(stumps)}")
 
 
 
@@ -1738,7 +1749,13 @@ class AppFigma:
                 return step
         return 10 * mag
 
-    def redraw_scatter(self, pts_xy: List[Tuple[float, float]], clusters: List[List[Tuple[float, float]]], *, src: str, frame: str, stamp: str, n: int):
+    def redraw_scatter(self, pts_xy: List[Tuple[float, float]], clusters: List[List[Tuple[float, float]]], *, src: str, frame: str, stamp: str, n: int, world=True):
+        if world and self._fixed_view and (self.node.position_xy is not None):
+            x0, x1, y0, y1 = self._compute_bounds([], [])  # will use fixed range around robot
+        else:
+            x0, x1, y0, y1 = self._compute_bounds(pts_xy, clusters)
+                
+        
         x0, x1, y0, y1 = self._compute_bounds(pts_xy, clusters)
         if self._static_bounds != (x0, x1, y0, y1):
             self._draw_static_grid(x0, x1, y0, y1)
