@@ -199,6 +199,9 @@ def main():
     # Publisher: current waypoint being targeted
     current_waypoint_pub = controller.create_publisher(Float32MultiArray, '/current_waypoint', 10)
 
+     # Subscriber: listens for avoidance points (from obstacle avoidance node)
+    controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
+
     # Callback: updates avoidance waypoint list
     def avoidance_callback(msg: Float32MultiArray):
         nonlocal waypoints, waypoint_index
@@ -221,9 +224,6 @@ def main():
             print(f"  [{i}] ({p[0]:.2f}, {p[1]:.2f})")
 
 
-
-    # Subscriber: listens for avoidance points (from obstacle avoidance node)
-    controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
     #-----------------GUI and Estop------------------------------------------------------
 
     # Publishers (durable so GUI gets last values)
