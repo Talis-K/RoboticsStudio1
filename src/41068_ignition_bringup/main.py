@@ -35,6 +35,11 @@ from rclpy.qos import QoSProfile, QoSDurabilityPolicy, ReliabilityPolicy, Histor
 import threading
 import time
 
+from typing import List, Tuple, Optional
+from math import atan2, cos, sin, acos, hypot, isfinite
+from threading import Lock
+
+
 #------ Mission control flags -------
 #Module-level so helpers can see them
 estop_flag   = threading.Event()
@@ -51,6 +56,97 @@ transient_qos = QoSProfile(
     depth=1,
     durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,)
 #----------------------------------------------------
+
+
+# --------- Obstacle state (thread-safe) ----------
+_obstacles: List[Tuple[float, float, float, float]] = []  # (cx,cy,r,timestamp)
+_obst_lock = Lock()
+
+# Tunables for avoidance
+DRONE_RADIUS = 0.20     # m (conservative)
+SAFETY_MARGIN = 0.35    # m (inflate obstacles by this)
+LOOKAHEAD = 6.0         # m (only consider obstacles within this distance from current pose)
+LINE_CLEAR_EXTRA = 0.15 # m (require this extra clearance beyond inflated radius)
+MAX_SUBGOALS = 5       # avoid infinite detours
+
+
+def _now_s() -> float:
+    return time.time()
+
+def _snapshot_obstacles() -> List[Tuple[float, float, float]]:
+    """Return [(cx,cy,R_inflated), ...] fresh obstacles."""
+    with _obst_lock:
+        # Keep very recent obstacles (last ~2.0s) to avoid stale ghosts
+        fresh = [(cx, cy, r) for (cx, cy, r, ts) in _obstacles if _now_s() - ts <= 2.0]
+    # Inflate by drone size + margin
+    return [(cx, cy, r + DRONE_RADIUS + SAFETY_MARGIN) for (cx, cy, r) in fresh]
+
+def _dist(a: Tuple[float,float], b: Tuple[float,float]) -> float:
+    return hypot(a[0]-b[0], a[1]-b[1])
+
+def _dist_point_to_segment(c: Tuple[float,float],
+                           a: Tuple[float,float],
+                           b: Tuple[float,float]) -> Tuple[float, float, Tuple[float,float]]:
+    """Return (distance, t, closest_point) from point C to segment AB, with t in [0,1]."""
+    ax, ay = a; bx, by = b; cx, cy = c
+    abx, aby = bx-ax, by-ay
+    ab2 = abx*abx + aby*aby
+    if ab2 == 0.0:
+        return hypot(cx-ax, cy-ay), 0.0, a
+    t = ((cx-ax)*abx + (cy-ay)*aby) / ab2
+    t = max(0.0, min(1.0, t))
+    px, py = ax + t*abx, ay + t*aby
+    return hypot(cx-px, cy-py), t, (px, py)
+
+def _choose_tangent(current: Tuple[float,float],
+                    goal: Tuple[float,float],
+                    center: Tuple[float,float],
+                    R: float) -> Tuple[float,float]:
+    """
+    Compute a good tangent point from current->circle(center,R).
+    Chooses left/right tangent based on smaller heading change toward the goal.
+    """
+    px, py = current
+    cx, cy = center
+    dx, dy = px - cx, py - cy
+    d = hypot(dx, dy)
+    if d <= R + 1e-3:
+        # We're inside/too close; push straight away from center by R+margin
+        ang = atan2(py - cy, px - cx)
+        return (cx + (R + 0.40)*cos(ang), cy + (R + 0.40)*sin(ang))
+
+    # Angle from center to current
+    base = atan2(dy, dx)
+    # Tangent offset
+    alpha = acos(max(-1.0, min(1.0, R / d)))
+
+    # Two candidate tangent points
+    t1 = (cx + R * cos(base + alpha), cy + R * sin(base + alpha))
+    t2 = (cx + R * cos(base - alpha), cy + R * sin(base - alpha))
+
+    # Prefer the one that better aligns with heading to the final goal
+    def heading_cost(tp):
+        gx, gy = goal
+        return abs(atan2(gy - tp[1], gx - tp[0]) - atan2(gy - py, gx - px))
+
+    return t1 if heading_cost(t1) < heading_cost(t2) else t2
+
+def _first_blocking_obstacle(current: Tuple[float,float],
+                             goal: Tuple[float,float],
+                             obstacles: List[Tuple[float,float,float]]) -> Optional[Tuple[float,float,float]]:
+    """Return the first obstacle whose inflated circle blocks line segment current->goal, else None."""
+    best = None
+    best_t = 1e9
+    for (cx, cy, R) in obstacles:
+        # Ignore far obstacles (beyond lookahead from current)
+        if _dist(current, (cx, cy)) > LOOKAHEAD:
+            continue
+        dist_to_line, t, _ = _dist_point_to_segment((cx, cy), current, goal)
+        if dist_to_line <= (R + LINE_CLEAR_EXTRA) and t < best_t:
+            best = (cx, cy, R)
+            best_t = t
+    return best
+
 
 class Mission(Node):
     @staticmethod
@@ -137,6 +233,8 @@ class Mission(Node):
     @staticmethod
     def move_to(controller: DroneController, target, tolerance: float = 0.2, speed: float = 1.0):
         """Translate toward 'target' in XY, aligning yaw first; obey pause/E-STOP."""
+
+        subgoals_done = 0
         while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
         #---------------------- GUI Pause engaged check -----------------------
             if pause_flag.is_set():
@@ -174,18 +272,74 @@ class Mission(Node):
         #------------------ Ensure Correct Yaw Orientation --------------------
             Mission.rotate(controller, pose, dx, dy)
         #----------------------------------------------------------------------
-            distance = np.hypot(dx, dy) #XY Plane distance to target
-            if distance <= tolerance: #If within tolerance exit function
+            cur = (float(pose[0]), float(pose[1]))
+            goal = (float(target[0]), float(target[1]))
+            distance = float(np.hypot(goal[0]-cur[0], goal[1]-cur[1]))
+            if distance <= max(1e-3, float(tolerance)):
                 return
 
-            if distance < 1.5: #Slow down near target to minimise overshooting
-                speed = distance/6 #Making speed proportional to distance when close to target
+            obs_list = _snapshot_obstacles()  # [(cx,cy,R_inflated), ...]
+            blocker  = _first_blocking_obstacle(cur, goal, obs_list)
 
-            duration = distance / speed/2 #Calculating duration so it
+                        # --- NEW: if blocked and we still have budget, visit a tangent sub-goal first
+            if blocker and subgoals_done < MAX_SUBGOALS:
+                try:
+                    cx, cy, R = blocker
+                    sub = _choose_tangent(cur, goal, (float(cx), float(cy)), float(max(0.0, R)))
 
-            controller.move_x(speed, duration)  #Queue forward motion
-            controller.start() #Checking motion is queued and executing turn
-            Mission.wait_motion_finish(controller) #Safety check and queue empty check
+                    # Inner loop to reach the sub-goal safely
+                    while rclpy.ok():
+                        # Respect pause/hold/estop
+                        if pause_flag.is_set() or hold_flag.is_set():
+                            try: controller.stop()
+                            except Exception: pass
+                            time.sleep(0.05); continue
+                        if estop_flag.is_set():
+                            try: controller.stop()
+                            except Exception: pass
+                            return
+
+                        pose2 = OdometryListener.update()
+                        if pose2 is None:
+                            time.sleep(0.05); continue
+
+                        cur2 = (float(pose2[0]), float(pose2[1]))
+                        dsub = float(np.hypot(sub[0]-cur2[0], sub[1]-cur2[1]))
+                        if dsub <= (tolerance + 0.10):
+                            break
+
+                        # Align then small straight nudge toward sub-goal
+                        Mission.rotate(controller, pose2, sub[0]-cur2[0], sub[1]-cur2[1])
+                        v = min(speed, max(0.15, dsub/6.0))      # gentle near subgoal
+                        duration = max(0.05, (dsub / max(v,1e-3)) / 2.0)
+
+                        controller.move_x(v, duration)
+                        controller.start()
+                        Mission.wait_motion_finish(controller)
+
+                    subgoals_done += 1
+                    # After subgoal, loop continues to pursue the original goal
+                    continue
+                except Exception:
+                    # If detour math fails, fall through and try straight motion
+                    pass
+
+
+            # try:
+            #     
+            # except Exception:
+            #     blocker = None  # if anything goes wrong, just fly straight
+
+            
+
+            v = float(speed)
+            if distance < 1.5:
+                v = max(0.15, distance/6.0)              # slow near goal
+            duration = max(0.05, (distance / max(v,1e-3)) / 2.0)  # clamp
+
+            controller.move_x(v, duration)
+            controller.start()
+            Mission.wait_motion_finish(controller)
 
 def main():
     """
@@ -355,7 +509,20 @@ def main():
     def _on_obj_geom(msg: Float32MultiArray):
         # Each message is [cx, cy, r]; forward to GUI/live avoidance topic
         pub_avoid_geom.publish(msg)
+
+        # keep a fresh, de-bounced obstacle list
+        data = list(msg.data or [])
+        if len(data) >= 3:
+            cx, cy, r = float(data[0]), float(data[1]), float(data[2])
+            if all(map(isfinite, (cx, cy, r))):
+                with _obst_lock:
+                    _obstacles.append((cx, cy, r, _now_s()))
+                    if len(_obstacles) > 256:
+                        del _obstacles[:128]
+
     controller.create_subscription(Float32MultiArray, '/obj_geometry', _on_obj_geom, 10)
+
+    
 
 
 
