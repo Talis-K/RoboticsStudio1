@@ -21,6 +21,7 @@ ament_python_install_package(chainsaw_detector2)
 install(PROGRAMS
   lidar_processing/filtered_lidar.py
   lidar_processing/tree_detector.py
+  lidar_processing/all_lidar_processing.py
   gui/gui_panel.py
   drone_control/odometry_listener.py
   drone_control/dronecontrolling.py

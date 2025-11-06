@@ -110,6 +110,12 @@ def generate_launch_description():
     )
     ld.add_action(mission_cmd_topic_arg)
 
+    tree_count_topic_arg   = DeclareLaunchArgument('tree_count_topic',   default_value='/mission/tree_count')
+    people_count_topic_arg = DeclareLaunchArgument('people_count_topic', default_value='/mission/people_count')
+    ld.add_action(tree_count_topic_arg)
+    ld.add_action(people_count_topic_arg)
+
+
     # after you add_action(mission_cmd_topic_arg)
     mission_cmd_topic = LaunchConfiguration('mission_cmd_topic')
     enable_mission_arg = DeclareLaunchArgument('enable_mission', default_value='True')
@@ -233,6 +239,9 @@ def generate_launch_description():
             'waypoints_path_topic': LaunchConfiguration('waypoints_path_topic'),
             'waypoints_array_topic': LaunchConfiguration('waypoints_array_topic'),
             'mission_cmd_topic':  LaunchConfiguration('mission_cmd_topic'),
+            'tree_count_topic':   LaunchConfiguration('tree_count_topic'),
+            'people_count_topic': LaunchConfiguration('people_count_topic'),
+
 
         }]
     )

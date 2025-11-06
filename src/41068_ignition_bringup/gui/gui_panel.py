@@ -80,6 +80,9 @@ class GuiNode(Node):
         self.declare_parameter('altitude_mode', 'auto')
         self.declare_parameter('altitude_topic', '')
 
+        self.declare_parameter('tree_count_topic',   '/mission/tree_count')
+        self.declare_parameter('people_count_topic', '/mission/people_count')
+
      
 
         self.declare_parameter('detections_topic', '/trees/cut')
@@ -105,6 +108,20 @@ class GuiNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
         )
+
+
+        from std_msgs.msg import Int32
+
+        self.tree_count: int   = 0
+        self.people_count: int = 0
+
+        tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
+        pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
+
+        if tct:
+            self.create_subscription(Int32, tct, lambda m: setattr(self, 'tree_count', int(m.data)), qos_transient)
+        if pct:
+            self.create_subscription(Int32, pct, lambda m: setattr(self, 'people_count', int(m.data)), qos_transient)
 
 
         # Subscriptions
@@ -863,6 +880,8 @@ class AppFigma:
         metrics.pack(side=tk.TOP, fill=tk.X)
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
+        self.tree_people_var = tk.StringVar(value="People: 0")
+        self._add_footer_counter(self.card_tree, self.tree_people_var)
         self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
         self.card_home    = self._metric_card(metrics, "Home Dist",  "-- m",    "Within bounds",     3, icon=("home",16))
@@ -1287,6 +1306,13 @@ class AppFigma:
     def _safe_has(self, name: str) -> bool:
         return hasattr(self, name) and getattr(self, name) is not None
 
+    def _add_footer_counter(self, card, var: tk.StringVar):
+        # A muted, small label stuck to bottom-right of the card
+        lbl = ttk.Label(card, textvariable=var, style="Muted.TLabel")
+        # Use place so it stays in the corner regardless of card content
+        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)
+        card.footer_people_lbl = lbl  # keep a ref if you need further tweaks
+
 
     def _mini_stat(self, parent, title, value, icon=None):
         tile = ttk.Frame(parent, style="Card.TFrame")
@@ -1389,8 +1415,16 @@ class AppFigma:
             # --- Metric cards you actually have: tree, audio, speed, home, time, waypts ---
 
             # Tree count (from PoseArray of detections)
-            trees = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
-            self._metric_set(self.card_tree, str(trees), "Detected Trees")
+            trees_via_topic = getattr(self.node, 'tree_count', 0)
+            if trees_via_topic > 0:
+                self._metric_set(self.card_tree, str(trees_via_topic), "Detected Trees")
+            else:
+                trees = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
+                self._metric_set(self.card_tree, str(trees), "Detected Trees")
+
+            people = int(getattr(self.node, 'people_count', 0))
+            self.tree_people_var.set(f"People: {people}")
+
 
             # Audio / chainsaw detector
             if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
