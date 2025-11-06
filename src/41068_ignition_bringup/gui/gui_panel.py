@@ -13,7 +13,7 @@ import numpy as np
 import tkinter as tk
 from tkinter import ttk
 import os
-
+from std_msgs.msg import Float32, String, Int32
 
 import rclpy
 from rclpy.node import Node
@@ -26,10 +26,13 @@ from PIL import ImageTk
 from sensor_msgs.msg import Image, LaserScan, CompressedImage, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float32MultiArray
 from geometry_msgs.msg import PoseArray
 from sensor_msgs.msg import BatteryState, Imu, NavSatFix, FluidPressure, Temperature
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
+from rclpy.qos import QoSDurabilityPolicy
+
+
 
 RAW_IMAGE_TYPE  = 'sensor_msgs/msg/Image'
 COMP_IMAGE_TYPE = 'sensor_msgs/msg/CompressedImage'
@@ -59,7 +62,7 @@ class GuiNode(Node):
         self.declare_parameter('scan_topic', '/scan')
         self.declare_parameter('cloud_topic', '')
         self.declare_parameter('image_topic', '')
-        self.declare_parameter('odom_topic', '/odometry/filtered')
+        self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('estop_topic', '/e_stop')
         self.declare_parameter('max_altitude', 10.0)
 
@@ -77,9 +80,16 @@ class GuiNode(Node):
         self.declare_parameter('altitude_mode', 'auto')
         self.declare_parameter('altitude_topic', '')
 
-        # Waypoints & detections
-        self.declare_parameter('waypoints_topic', '')
+     
+
         self.declare_parameter('detections_topic', '/trees/cut')
+
+        #Audio Detetction
+        # Audio / Chainsaw detector topics
+        self.declare_parameter('chainsaw_status_topic',  '/audio/chainsaw/status')   # std_msgs/String
+        self.declare_parameter('chainsaw_metrics_topic', '/audio/chainsaw/metrics')  # std_msgs/Float32MultiArray [class_id, conf, f0_hz, band_power]
+
+
 
         self.msg_queue = msg_queue
         self.img_queue = img_queue
@@ -89,6 +99,13 @@ class GuiNode(Node):
             history=HistoryPolicy.KEEP_LAST,
             depth=10,
         )
+        qos_transient = QoSProfile(
+            depth=1,
+            history=HistoryPolicy.KEEP_LAST,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+        )
+
 
         # Subscriptions
         scan_topic = self.get_parameter('scan_topic').get_parameter_value().string_value
@@ -127,6 +144,25 @@ class GuiNode(Node):
         self.position_xy: Optional[Tuple[float, float]] = None
         self.yaw_rad: Optional[float] = None
 
+
+
+                # --- IMU accel display options ---
+        self.declare_parameter('imu_gravity_comp', True)     # subtract gravity? (world frame)
+        self.declare_parameter('imu_show_world', True)       # display in world(odom) frame; else IMU body frame
+        self.declare_parameter('g0', 9.80665)                # gravity constant (m/s^2)
+        self.declare_parameter('accel_alpha', 0.3)           # EMA smoothing factor (0..1)
+
+        self._accel_alpha = float(self.get_parameter('accel_alpha').value)
+        self._g0 = float(self.get_parameter('g0').value)
+        self._imu_gravity_comp = bool(self.get_parameter('imu_gravity_comp').value)
+        self._imu_show_world    = bool(self.get_parameter('imu_show_world').value)
+
+        # live accel state
+        self.accel_body = None     # (ax, ay, az) in IMU/body frame (m/s^2)
+        self.accel_world = None    # (Ax, Ay, Az) in world/odom frame (m/s^2)
+        self.accel_mag = None      # |A| of whichever set we choose to show
+
+
         # Mission/health state
         self.battery_pct: Optional[float] = None
         self.flight_mode: Optional[str] = None
@@ -134,6 +170,13 @@ class GuiNode(Node):
         self.imu_rpy: Optional[Tuple[float, float, float]] = None
         self.wind_ms: Optional[float] = None
         self.wind_heading_deg: Optional[float] = None
+
+        # Audio detection state
+        self.audio_class: Optional[str] = None      # "chainsaw" / "ambient" / "other"
+        self.audio_conf: Optional[float] = None     # 0..1
+        self.audio_f0_hz: Optional[float] = None    # dominant Hz
+        self.audio_band_power: Optional[float] = None
+
 
         # Barometer / Temperature
         self.baro_pressure_pa: Optional[float] = None
@@ -163,6 +206,70 @@ class GuiNode(Node):
         # Subscribe to extra topics
         self._subscribe_extras()
 
+
+
+
+                # ---- AUDIO (embedded detector) ----
+        self.declare_parameter('mic_audio_topic', '/microphone/audio')  # raw Float32MultiArray audio blocks
+        self.declare_parameter('audio_fs',        16000)
+        self.declare_parameter('audio_frame_ms',  500)
+        self.declare_parameter('audio_hop_ms',    250)
+        self.declare_parameter('chainsaw_low_hz', 90.0)
+        self.declare_parameter('chainsaw_high_hz',400.0)
+        self.declare_parameter('audio_conf_thresh', 0.55)
+        self.declare_parameter('audio_decision_window', 5)
+        # Waypoints
+        self.declare_parameter('waypoints_path_topic',  '/mission/waypoints_path')
+        self.declare_parameter('waypoints_array_topic', '/mission/waypoints')
+
+
+        wpt_path = self.get_parameter('waypoints_path_topic').get_parameter_value().string_value or ''
+        wpt_arr  = self.get_parameter('waypoints_array_topic').get_parameter_value().string_value or ''
+
+        if wpt_path:
+            self.create_subscription(Path, wpt_path, self.on_path, qos_transient)
+        if wpt_arr:
+            self.create_subscription(PoseArray, wpt_arr, self.on_posearray_waypoints, qos_transient)
+
+        
+        self.wp_idx = 0
+        self.wp_total = 0
+
+        self.sub_wp_idx   = self.create_subscription(Int32, '/mission/waypoint_index',
+                                                    lambda m: self._on_wp_idx(m.data), qos_transient)
+        self.sub_wp_total = self.create_subscription(Int32, '/mission/waypoint_total',
+                                                    lambda m: self._on_wp_total(m.data), qos_transient)
+        self.declare_parameter('mission_cmd_topic', '/mission/cmd')
+        cmd_topic = self.get_parameter('mission_cmd_topic').get_parameter_value().string_value or '/mission/cmd'
+        self.mission_cmd_pub = self.create_publisher(String, cmd_topic, 10)
+        self.get_logger().info(f"[GUI] Command publisher on {cmd_topic}")
+        self.mission_state = "IDLE"
+        self.mission_progress = 0.0
+
+
+        self._aud_topic = self.get_parameter('mic_audio_topic').get_parameter_value().string_value
+        self._fs        = int(self.get_parameter('audio_fs').value)
+        self._frame_len = int(self.get_parameter('audio_frame_ms').value) * self._fs // 1000
+        self._hop_len   = int(self.get_parameter('audio_hop_ms').value)   * self._fs // 1000
+        self._band_lo   = float(self.get_parameter('chainsaw_low_hz').value)
+        self._band_hi   = float(self.get_parameter('chainsaw_high_hz').value)
+        self._aud_conf_thresh = float(self.get_parameter('audio_conf_thresh').value)
+        from collections import deque
+        self._aud_votes = deque(maxlen=max(1, int(self.get_parameter('audio_decision_window').value)))
+
+        import numpy as _np
+        self._aud_buf = _np.zeros(0, dtype=_np.float32)
+
+        # Subscribe to mic audio (Float32MultiArray blocks)
+        from std_msgs.msg import Float32MultiArray
+        qos_audio = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
+                            history=HistoryPolicy.KEEP_LAST, depth=10)
+        self.create_subscription(Float32MultiArray, self._aud_topic, self._on_audio_block, qos_audio)
+
+        # Process timer (every hop)
+        self._aud_timer = self.create_timer(self._hop_len / max(1, self._fs), self._audio_process)
+
+
     # ---- extra subscriptions ----
     def _subscribe_extras(self):
         bt = self.get_parameter('battery_topic').get_parameter_value().string_value
@@ -190,21 +297,39 @@ class GuiNode(Node):
         if tpc:
             self.create_subscription(Temperature, tpc, self.on_temperature, 10)
 
-        # Waypoints
-        wpt = self.get_parameter('waypoints_topic').get_parameter_value().string_value
-        if wpt:
-            self.create_subscription(Path, wpt, self.on_path, 10)
-            self.create_subscription(PoseArray, wpt, self.on_posearray_waypoints, 10)
-        else:
-            for name, types in self.get_topic_names_and_types():
-                if 'nav_msgs/msg/Path' in types:
-                    self.create_subscription(Path, name, self.on_path, 10)
-                if 'geometry_msgs/msg/PoseArray' in types and 'waypoint' in name.lower():
-                    self.create_subscription(PoseArray, name, self.on_posearray_waypoints, 10)
 
         dt = self.get_parameter('detections_topic').get_parameter_value().string_value
         if dt:
             self.create_subscription(PoseArray, dt, self.on_tree_detections, 10)
+
+        # Chainsaw detector subscriptions
+        st = self.get_parameter('chainsaw_status_topic').get_parameter_value().string_value
+        if st:
+            self.create_subscription(String, st, self.on_chainsaw_status, 10)
+
+        mt = self.get_parameter('chainsaw_metrics_topic').get_parameter_value().string_value
+        if mt:
+            self.create_subscription(Float32MultiArray, mt, self.on_chainsaw_metrics, 10)
+
+        # initial GUI state = PAUSED until Start is pressed
+        self.mission_state = "PAUSED"
+
+        # get mission state from main (latched QoS so late joiners see last)
+        self.create_subscription(
+            String,
+            '/mission/state',
+            self._on_state,
+            QoSProfile(
+                depth=1,
+                history=HistoryPolicy.KEEP_LAST,
+                reliability=ReliabilityPolicy.RELIABLE,
+                durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
+            )
+        )
+
+
+    def _on_wp_idx(self, v):   self.wp_idx = int(v)
+    def _on_wp_total(self, v): self.wp_total = int(v)
 
     # ---- E-STOP ----
     def engage_estop(self):
@@ -247,6 +372,127 @@ class GuiNode(Node):
             self._img_sub = self.create_subscription(CompressedImage, cam_topic, self.on_image_compressed, 10)
         self._cam_type = cam_type
 
+    @staticmethod
+    def _quat_to_R(qx, qy, qz, qw):
+        # Rotation matrix: body -> world
+        xx, yy, zz = qx*qx, qy*qy, qz*qz
+        xy, xz, yz = qx*qy, qx*qz, qy*qz
+        wx, wy, wz = qw*qx, qw*qy, qw*qz
+        return [
+            [1-2*(yy+zz),   2*(xy-wz),     2*(xz+wy)],
+            [  2*(xy+wz), 1-2*(xx+zz),     2*(yz-wx)],
+            [  2*(xz-wy),   2*(yz+wx),   1-2*(xx+yy)]
+        ]
+
+    @staticmethod
+    def _mat_vec3(M, v):
+        return (
+            M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+            M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+            M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2],
+        )
+
+    @staticmethod
+    def _ema(prev, new, alpha):
+        if prev is None: return new
+        return tuple(alpha*n + (1-alpha)*p for p, n in zip(prev, new))
+
+
+    def on_chainsaw_status(self, msg: String):
+        """
+        Accepts lines like: 'class=chainsaw conf=1.00 f0=180.0Hz bandPwr=0.91'
+        Robust to extra/missing fields.
+        """
+        s = msg.data.strip()
+        # defaults
+        cls, conf, f0, bp = None, None, None, None
+        try:
+            for tok in s.replace(',', ' ').split():
+                if tok.startswith('class='):
+                    cls = tok.split('=',1)[1]
+                elif tok.startswith('conf='):
+                    conf = float(tok.split('=',1)[1])
+                elif tok.startswith('f0='):
+                    v = tok.split('=',1)[1].lower().replace('hz','')
+                    f0 = float(v)
+                elif tok.startswith('bandPwr=') or tok.startswith('bandpwr='):
+                    bp = float(tok.split('=',1)[1])
+        except Exception:
+            pass
+
+        # apply if present
+        if cls is not None: self.audio_class = cls
+        if conf is not None: self.audio_conf = conf
+        if f0 is not None: self.audio_f0_hz = f0
+        if bp is not None: self.audio_band_power = bp
+
+    def on_chainsaw_metrics(self, msg: Float32MultiArray):
+        """
+        Expects [class_id, conf, f0_hz, band_power]
+        class_id: 0=ambient, 1=chainsaw, 2=other (tweak to your node)
+        """
+        try:
+            data = list(msg.data)
+            self.create_subscription(String,  '/audio/classification',
+                         lambda m: setattr(self, 'audio_class', m.data.strip()), 10)
+
+            self.create_subscription(Float32, '/audio/chainsaw_confidence',
+                                    lambda m: setattr(self, 'audio_conf', float(m.data)), 10)
+
+            self.create_subscription(Float32, '/audio/dominant_frequency',
+                                    lambda m: setattr(self, 'audio_f0_hz', float(m.data)), 10)
+
+            self.create_subscription(Float32, '/audio/psd_band_power',
+                                    lambda m: setattr(self, 'audio_band_power', float(m.data)), 10)
+            if len(data) >= 4:
+                class_id = int(round(data[0]))
+                self.audio_conf = float(data[1])
+                self.audio_f0_hz = float(data[2])
+                self.audio_band_power = float(data[3])
+                self.audio_class = {0: "ambient", 1: "chainsaw", 2: "other"}.get(class_id, f"class_{class_id}")
+        except Exception:
+            pass
+
+    def _on_state(self, msg: String):
+        st = (msg.data or "").strip().upper()
+        self.mission_state = st
+
+        # Keep only *flags* here; never call GUI methods from the node.
+        if st == "E-STOP":
+            self._estop = True
+        elif st in ("RUNNING", "PAUSED", "IDLE", "STOPPED", "RTL", "LAND"):
+            # Clear local E-STOP flag when mission reports a non-estop state.
+            # (If you want a physical latch, remove this line and require Reset.)
+            self._estop = False
+
+
+
+    def _on_progress(self, msg):
+        self.mission_progress = msg.data
+        try:
+            self.progress_bar['value'] = int(self.mission_progress * 100)
+        except:
+            pass
+
+    def _update_wp_label(self):
+    # whichever label you use:
+    # e.g., self.tree_count or self.waypoint_count_label — just set the textvariable or configure
+        text = f"{self.wp_idx}/{self.wp_total}" if self.wp_total else "0/0"
+        try:
+            self.waypoint_label_var.set(text)   # if using a StringVar
+        except Exception:
+            self.waypoint_label.configure(text=text)
+
+    def _update_waypoint_label(self):
+        text = f"{self.wp_idx}/{self.wp_total}"
+        try:
+            self.waypoint_label_var.set(text)  # if using StringVar
+        except:
+            try:
+                self.waypoint_label.configure(text=text)  # if direct widget configure
+            except:
+                pass
+
     def _resolve_camera_topic(self, requested: str):
         if requested:
             for n, ts in self.get_topic_names_and_types():
@@ -262,10 +508,93 @@ class GuiNode(Node):
                 return n, 'compressed'
         return None, None
 
+    def on_estop_pressed(self):
+        self.estop_pub.publish(Bool(data=True))
+
+
+    def _on_audio_block(self, msg):
+        """Append incoming audio samples (Float32MultiArray) to the buffer."""
+        try:
+            import numpy as np
+            arr = np.asarray(msg.data, dtype=np.float32).ravel()
+            if arr.size:
+                self._aud_buf = np.concatenate([self._aud_buf, arr])
+        except Exception:
+            pass
+
+    def _audio_process(self):
+        """Run a simple FFT-based detector over frames and update GUI fields."""
+        try:
+            import numpy as np
+            if self._aud_buf.size < self._frame_len:
+                return
+
+            # Take one frame, keep overlap (hop)
+            x = self._aud_buf[:self._frame_len]
+            self._aud_buf = self._aud_buf[self._hop_len:]
+
+            # Window + FFT
+            win = np.hanning(len(x))
+            xw  = x * win
+            spec = np.fft.rfft(xw)
+            mag  = np.abs(spec) + 1e-12
+            freqs = np.fft.rfftfreq(len(x), d=1.0 / self._fs)
+
+            # Focus chainsaw band
+            mask = (freqs >= self._band_lo) & (freqs <= self._band_hi)
+            if not np.any(mask):
+                return
+            band_mag   = mag[mask]
+            band_freqs = freqs[mask]
+            peak_idx   = int(np.argmax(band_mag))
+            f0         = float(band_freqs[peak_idx])
+
+            # Relative band power
+            band_power  = float(np.sum(band_mag**2))
+            total_power = float(np.sum(mag**2)) + 1e-12
+            rel_band    = band_power / total_power
+
+            # Harmonicity (quick & dirty)
+            max_hz = 2000.0
+            kmax   = int(max_hz // max(f0, 1.0))
+            hvals  = []
+            bw_hz  = max(5.0, f0 * 0.05)
+            for k in range(1, max(2, kmax + 1)):
+                tgt = k * f0
+                if tgt > freqs[-1]:
+                    break
+                m = (freqs >= tgt - bw_hz) & (freqs <= tgt + bw_hz)
+                if np.any(m):
+                    hvals.append(np.max(mag[m]))
+            harm = float(np.mean(hvals) / (np.mean(mag) + 1e-12)) if hvals else 0.0
+
+            # Confidence & label
+            conf  = float(0.6 * np.clip(rel_band * 2.0, 0.0, 1.0) + 0.4 * np.clip(harm, 0.0, 1.0))
+            label = 'chainsaw' if conf >= self._aud_conf_thresh else 'ambient'
+
+            # Smooth over a short window
+            self._aud_votes.append((label, conf, f0, rel_band))
+            labels = [d[0] for d in self._aud_votes]
+            maj    = max(set(labels), key=labels.count)
+            mean_c = float(np.mean([d[1] for d in self._aud_votes]))
+            mean_f = float(np.mean([d[2] for d in self._aud_votes]))
+            mean_p = float(np.mean([d[3] for d in self._aud_votes]))
+
+            # Update the same fields your poll_telemetry() already reads
+            self.audio_class       = maj
+            self.audio_conf        = mean_c
+            self.audio_f0_hz       = mean_f
+            self.audio_band_power  = mean_p
+
+        except Exception:
+            # Keep GUI robust
+            pass
+
+
     # ---- Callbacks ----
     def on_scan(self, msg: LaserScan):
-        if self._estop:
-            return
+        # if self._estop:
+        #     return
 
         # Drop out-of-order timestamps
         stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
@@ -392,17 +721,52 @@ class GuiNode(Node):
         if math.isfinite(getattr(msg, 'altitude', float('nan'))):
             self._altitude_gps = float(msg.altitude)
 
+    def on_start_clicked(self):
+    # your other GUI stuff...
+     self.mission_cmd_pub.publish(String(data='start'))
+
+    def on_stop_clicked(self):
+     self.mission_cmd_pub.publish(String(data='stop'))
+
     def on_imu(self, msg: Imu):
+        # --- orientation to RPY (unchanged) ---
         q = msg.orientation
         sinr_cosp = 2 * (q.w * q.x + q.y * q.z)
         cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y)
         roll = math.atan2(sinr_cosp, cosr_cosp)
+
         sinp = 2 * (q.w * q.y - q.z * q.x)
         pitch = math.asin(max(-1.0, min(1.0, sinp)))
+
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         yaw = math.atan2(siny_cosp, cosy_cosp)
         self.imu_rpy = (roll, pitch, yaw)
+
+        # --- raw linear acceleration in IMU/body frame ---
+        ax = float(msg.linear_acceleration.x)
+        ay = float(msg.linear_acceleration.y)
+        az = float(msg.linear_acceleration.z)
+        a_body = (ax, ay, az)
+
+        # smooth body accel (EMA)
+        self.accel_body = self._ema(self.accel_body, a_body, self._accel_alpha)
+
+        # --- rotate to world and (optionally) remove gravity ---
+        R_bw = self._quat_to_R(q.x, q.y, q.z, q.w)       # body -> world
+        a_world = self._mat_vec3(R_bw, self.accel_body)
+
+        if self._imu_gravity_comp:
+            # subtract gravity in world Z (down = +g depending on convention; here we subtract +g on +Z)
+            a_world = (a_world[0], a_world[1], a_world[2] - self._g0)
+
+        # smooth world accel too (keeps both representations pleasant)
+        self.accel_world = self._ema(self.accel_world, a_world, self._accel_alpha)
+
+        # pick what to present in GUI
+        Ax, Ay, Az = (self.accel_world if self._imu_show_world else self.accel_body)
+        self.accel_mag = math.sqrt(Ax*Ax + Ay*Ay + Az*Az)
+
 
     def on_baro(self, msg: FluidPressure):
         if math.isfinite(msg.fluid_pressure) and msg.fluid_pressure > 0:
@@ -418,18 +782,24 @@ class GuiNode(Node):
                 self._altitude_baro = _hypsometric_altitude(self.baro_pressure_pa, T_k, self._p0_pa)
 
     def on_path(self, msg: Path):
-        pts = [(p.pose.position.x, p.pose.position.y) for p in msg.poses]
+        pts = [(p.pose.position.x, p.pose.position.y) for p in msg.poses] if msg.poses else []
         self.waypoints_xy = pts
         if self.position_xy and pts:
             rx, ry = self.position_xy
-            self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0]) ** 2 + (ry - pts[i][1]) ** 2)
+            try:
+                self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0])**2 + (ry - pts[i][1])**2)
+            except ValueError:
+                self.next_wp_idx = 0
 
     def on_posearray_waypoints(self, msg: PoseArray):
-        pts = [(p.position.x, p.position.y) for p in msg.poses]
+        pts = [(p.position.x, p.position.y) for p in msg.poses] if msg.poses else []
         self.waypoints_xy = pts
         if self.position_xy and pts:
             rx, ry = self.position_xy
-            self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0]) ** 2 + (ry - pts[i][1]) ** 2)
+            try:
+                self.next_wp_idx = min(range(len(pts)), key=lambda i: (rx - pts[i][0])**2 + (ry - pts[i][1])**2)
+            except ValueError:
+                self.next_wp_idx = 0
 
     def on_tree_detections(self, msg: PoseArray):
         self.tree_positions_xy = [(p.position.x, p.position.y) for p in msg.poses]
@@ -493,7 +863,7 @@ class AppFigma:
         metrics.pack(side=tk.TOP, fill=tk.X)
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
-        self.card_heading = self._metric_card(metrics, "Heading",    "--",     "",                  1, icon=("compass",16))
+        self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
         self.card_home    = self._metric_card(metrics, "Home Dist",  "-- m",    "Within bounds",     3, icon=("home",16))
         self.card_time    = self._metric_card(metrics, "Flight Time","00:00",   "Elapsed",           4, icon=("time",16))
@@ -573,7 +943,8 @@ class AppFigma:
                 image=self.icons.get("compass", 16), compound="left").pack(side="left", padx=10, pady=8)
 
         # Right: flight mode chip (dynamic)
-        self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
+        #self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
+        self._mode_chip = self._chip(ctl_hdr, "PAUSED", bg="#FFF6E6", fg="#9A6B00", hover_bg="#FFEBC7")
 
         # Body (your existing content)
         ctl_body = ttk.Frame(ctl, style="Card.TFrame", padding=(6, 8))
@@ -872,17 +1243,22 @@ class AppFigma:
         card = ttk.Labelframe(parent, text=title, padding=(12,8), style="Card.TLabelframe")
         card.grid(row=0, column=idx, sticky="nsew", padx=8, pady=(4,8))
         parent.grid_columnconfigure(idx, weight=1)
-        # top-right tiny icon (to match Figma glyphs near titles)
+
         if icon:
             name, size = icon
             ic = self.icons.get(name, size)
             if ic:
                 glyph = ttk.Label(card, image=ic, style="Card.TFrame")
                 glyph.image = ic
-                glyph.place(relx=1.0, x=-10, y=6, anchor="ne")  # neat right padding
-        ttk.Label(card, text=value, style="MetricValue.TLabel").pack(anchor="w", pady=(2,0))
-        ttk.Label(card, text=sub,   style="MetricSub.TLabel").pack(anchor="w")
+                glyph.place(relx=1.0, x=-10, y=6, anchor="ne")
+
+        # create once; store refs on the frame
+        card.val_lbl = ttk.Label(card, text=value, style="MetricValue.TLabel")
+        card.sub_lbl = ttk.Label(card, text=sub,   style="MetricSub.TLabel")
+        card.val_lbl.pack(anchor="w", pady=(2,0))
+        card.sub_lbl.pack(anchor="w")
         return card
+
 
     def _pill(self, parent, text, color, cb, payload, outline=False, icon=None):
         if outline:
@@ -907,6 +1283,10 @@ class AppFigma:
                 b.config(image=ic, compound="left")
                 b.image = ic
         return b
+    
+    def _safe_has(self, name: str) -> bool:
+        return hasattr(self, name) and getattr(self, name) is not None
+
 
     def _mini_stat(self, parent, title, value, icon=None):
         tile = ttk.Frame(parent, style="Card.TFrame")
@@ -928,17 +1308,29 @@ class AppFigma:
         self.node.engage_estop()
         self._set_estop_ui(True)
 
+    
+
     def on_estop_reset(self):
         self.node.reset_estop()
         self._set_estop_ui(False)
 
+  
+
     def _send_cmd(self, cmd: str):
         try:
-            if not hasattr(self, 'mission_cmd_pub'):
-                self.mission_cmd_pub = self.node.create_publisher(String, '/mission/command', 10)
-            self.mission_cmd_pub.publish(String(data=cmd))
-        except Exception:
-            pass
+            self.node.mission_cmd_pub.publish(String(data=cmd))
+            # optimistic local preview
+            if   cmd == "start":  self.node.mission_state = "RUNNING"
+            elif cmd == "pause":  self.node.mission_state = "PAUSED"
+            elif cmd == "resume": self.node.mission_state = "RUNNING"
+            elif cmd == "stop":   self.node.mission_state = "STOPPED"
+            elif cmd == "rtl":    self.node.mission_state = "RTL"
+            elif cmd == "land":   self.node.mission_state = "LAND"
+            print(f"[GUI] Sent mission cmd: {cmd}")
+        except Exception as e:
+            print(f"[GUI] Failed to publish mission cmd: {e}")
+
+
 
     # ------------------------------ Pollers (kept, with extra label updates) ----
     def poll_img(self):
@@ -987,142 +1379,134 @@ class AppFigma:
         self.root.after(40, self.poll_scan)
 
     def poll_telemetry(self):
-        # topbar
-        bp = self.node.battery_pct
-        self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: --%")
-        self.lbl_rc.config(text="RC: Strong")
-        self.lbl_utc.config(text=datetime.datetime.utcnow().strftime("UTC %H:%M:%S"))
+        try:
+            # Top bar
+            bp = self.node.battery_pct
+            self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: 100%")
+            self.lbl_rc.config(text="RC: Strong")
+            self.lbl_utc.config(text=datetime.datetime.utcnow().strftime("UTC %H:%M:%S"))
+
+            # --- Metric cards you actually have: tree, audio, speed, home, time, waypts ---
+
+            # Tree count (from PoseArray of detections)
+            trees = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
+            self._metric_set(self.card_tree, str(trees), "Detected Trees")
+
+            # Audio / chainsaw detector
+            if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
+                f0 = f"{self.node.audio_f0_hz:.0f} Hz" if self.node.audio_f0_hz is not None else "-- Hz"
+                cls = (self.node.audio_class or "—")
+                sub = f"{cls} ({self.node.audio_conf:.2f})" if (
+                    self.node.audio_conf is not None and math.isfinite(self.node.audio_conf)
+                ) else cls
+                self._metric_set(self.card_audio, f0, sub)
+            else:
+                self._metric_set(self.card_audio, "-- Hz", "no signal")
+
+            # Speed (breadcrumb-based estimate)
+            spd_ms = self._estimate_speed_ms()
+            if spd_ms is not None:
+                self._metric_set(self.card_speed, f"{spd_ms:.1f} m/s", f"{spd_ms*3.6:.1f} km/h")
+            else:
+                self._metric_set(self.card_speed, "-- m/s", "-- km/h")
+
+            # Home distance (distance from origin)
+            if self.node.position_xy:
+                rx, ry = self.node.position_xy
+                dist = math.hypot(rx, ry)
+                self._metric_set(self.card_home, f"{dist:.0f} m", "Within bounds" if dist < 500 else "Far")
+            else:
+                self._metric_set(self.card_home, "-- m", "")
+
+            # Flight time
+            ft = int(time.time() - getattr(self.node, "_start_time", time.time()))
+            self._metric_set(self.card_time, f"{ft//60:02d}:{ft%60:02d}", "Elapsed")
+
+            # Waypoints (from Path/PoseArray + nearest index)
+            # Waypoints via mission topics if present, else fall back to local estimate
+            if getattr(self.node, "wp_total", 0) > 0:
+                self._metric_set(self.card_waypts, f"{self.node.wp_idx}/{self.node.wp_total}", "Completed")
+            else:
+                wp_total = len(self.node.waypoints_xy) if self.node.waypoints_xy else 0
+                wp_done  = min(self.node.next_wp_idx, wp_total)
+                self._metric_set(self.card_waypts, f"{wp_done}/{wp_total}", "Completed")
 
 
-        # Update Tree Count & Waypoints
-        if hasattr(self, "card_tree"):
-            self.card_tree.children["!label"].config(text=str(self.tree_count))  # or however you store it
 
-        if hasattr(self, "card_waypts"):
-            self.card_waypts.children["!label"].config(text=f"{self.waypoints_completed}/{self.waypoints_total}")
+            # --- Odometry / IMU / Altitude panels ---
 
-        # GPS
-        fix = self.node.gps_fix
-        if fix and all(map(math.isfinite, [fix.latitude, fix.longitude])):
-            # satellite count is not directly provided; show GPS if unavailable
-            self._metric_set(self.card_gps, "12 Sats", f"{fix.latitude:.4f}, {fix.longitude:.4f}")
-        else:
-            self._metric_set(self.card_gps, "-- Sats", "--, --")
+            # Odometry
+            xy = self.node.position_xy or (float('nan'), float('nan'))
+            yaw = self.node.yaw_rad
+            z = self._select_altitude()
+            self.lbl_odo.config(text=(
+                f"Position X: {xy[0]:6.2f}  m\n"
+                f"Position Y: {xy[1]:6.2f}  m\n"
+                f"Position Z: {(z if (z is not None and math.isfinite(z)) else float('nan')):6.2f}  m\n"
+                f"Heading:    {(math.degrees(yaw) if yaw is not None else float('nan')):6.1f}"
+            ))
 
-        # Heading
-        if self.node.imu_rpy:
-            _, _, y = self.node.imu_rpy
-            hdg = (math.degrees(y) + 360) % 360
-            # rough cardinal like screenshot
-            card = "N"
-            for ang, lab in [(22.5,"N"), (67.5,"NE"), (112.5,"E"), (157.5,"SE"),
-                             (202.5,"S"), (247.5,"SW"), (292.5,"W"), (337.5,"NW"), (360,"N")]:
-                if hdg < ang: card = lab; break
-            self._metric_set(self.card_heading, f"{hdg:.0f}", card)
-        else:
-            self._metric_set(self.card_heading, "--", "")
+                        # --- IMU panel readout ---
+            if self.node.imu_rpy:
+                r, p, y = self.node.imu_rpy
+                # acceleration text
+                if (self.node.accel_world is not None) or (self.node.accel_body is not None):
+                    Ax, Ay, Az = (self.node.accel_world if self.node._imu_show_world else self.node.accel_body)
+                    Amag = self.node.accel_mag if (self.node.accel_mag is not None) else float('nan')
+                    frame_tag = "world" if self.node._imu_show_world else "body"
+                    gtag = " (gravity-comp)" if self.node._imu_gravity_comp and self.node._imu_show_world else ""
+                    self.lbl_imu.config(
+                        text=f"Roll: {math.degrees(r):.1f}°   Pitch: {math.degrees(p):.1f}°   Yaw: {math.degrees(y):.1f}°\n"
+                            f"a[{frame_tag}]{gtag}:  Ax={Ax:.2f}  Ay={Ay:.2f}  Az={Az:.2f}  |a|={Amag:.2f} m/s²"
+                    )
+                else:
+                    self.lbl_imu.config(
+                        text=f"Roll: {math.degrees(r):.1f}°   Pitch: {math.degrees(p):.1f}°   Yaw: {math.degrees(y):.1f}°\n"
+                            f"a: — m/s²"
+                    )
+            else:
+                self.lbl_imu.config(text="Roll:    Pitch:    Yaw:    \na: — m/s²")
 
-        # Speed (breadcrumb-based estimate)
-        spd_ms = self._estimate_speed_ms()
-        if spd_ms is not None:
-            self._metric_set(self.card_speed, f"{spd_ms:.1f} m/s", f"{spd_ms*3.6:.1f} km/h")
-        else:
-            self._metric_set(self.card_speed, "-- m/s", "-- km/h")
 
-        # Home distance (from origin placeholder)
-        if self.node.position_xy:
-            rx, ry = self.node.position_xy
-            dist = math.hypot(rx, ry)
-            self._metric_set(self.card_home, f"{dist:.0f} m", "Within bounds" if dist < 500 else "Far")
-        else:
-            self._metric_set(self.card_home, "-- m", "")
+            # Altitude progress bar
+            max_alt = max(1.0, float(self.node.get_parameter('max_altitude').value))
+            cur_alt = z if (z is not None and math.isfinite(z)) else 0.0
+            self.alt_pb["maximum"] = max_alt
+            self.alt_var.set(max(0.0, min(max_alt, cur_alt)))
+            self.lbl_alt_text.config(text=f"Current: {cur_alt:.1f} m   Ground: 0 m   Max: {max_alt:.0f} m")
+            if cur_alt >= 0.8 * max_alt:
+                self.alt_pb.configure(style="AltBarWarn.Horizontal.TProgressbar")
+            elif cur_alt >= 0.5 * max_alt:
+                self.alt_pb.configure(style="AltBarMid.Horizontal.TProgressbar")
+            else:
+                self.alt_pb.configure(style="AltBar.Horizontal.TProgressbar")
 
-        # Flight time
-        ft = int(time.time() - getattr(self.node, "_start_time", time.time()))
-        self._metric_set(self.card_time, f"{ft//60:02d}:{ft%60:02d}", "Elapsed")
+            # Status line (use your counters if you added them; otherwise simple)
+                        # Status line driven by /mission/state (fallbacks for safety)
+            state = (self.mission_state or "").upper()
+            if not state:
+                state = "PAUSED"  # default visual until we hear from main
+            self.lbl_status.config(text=f"Status: {state}")
 
-        # Wind (no direct topic yet)
-        if self.node.wind_ms is not None:
-            sub = f"NW {self.node.wind_heading_deg:.0f}" if self.node.wind_heading_deg else ""
-            self._metric_set(self.card_wind, f"{self.node.wind_ms:.1f} m/s", sub)
-        else:
-            self._metric_set(self.card_wind, "5 m/s", "")
 
-        # Odometry block
-        xy = self.node.position_xy or (float('nan'), float('nan'))
-        yaw = self.node.yaw_rad
-        z = self._select_altitude()
-        self.lbl_odo.config(text=(
-            f"Position X: {xy[0]:6.2f}  m\n"
-            f"Position Y: {xy[1]:6.2f}  m\n"
-            f"Position Z: {(z if (z is not None and math.isfinite(z)) else float('nan')):6.2f}  m\n"
-            f"Heading:    {(math.degrees(yaw) if yaw is not None else float('nan')):6.1f}"
-        ))
+                        # Update chip style by state
+            if state == "RUNNING":
+                self._mode_chip.config(text="RUNNING", bg="#E9FFF6", fg="#156F4B")
+            elif state == "PAUSED":
+                self._mode_chip.config(text="PAUSED", bg="#FFF6E6", fg="#9A6B00")
+            elif state == "E-STOP":
+                self._mode_chip.config(text="E-STOP", bg="#FDECEC", fg="#E11900")
+            else:
+                self._mode_chip.config(text=state or "PAUSED", bg="#EEF1F6", fg="#304050")
 
-        # IMU block
-        if self.node.imu_rpy:
-            r, p, y = self.node.imu_rpy
-            self.lbl_imu.config(text=f"Roll: {math.degrees(r):.1f}�   Pitch: {math.degrees(p):.1f}�   Yaw: {math.degrees(y):.1f}�   Accel: 9.81 m/s�")
-        else:
-            self.lbl_imu.config(text="Roll:    Pitch:    Yaw:     Accel: 9.81 m/s�")
 
-        # Altitude block
-        max_alt = max(1.0, float(self.node.get_parameter('max_altitude').value))
-        cur_alt = z if (z is not None and math.isfinite(z)) else 0.0
-        self.alt_pb["maximum"] = max_alt
-        self.alt_var.set(max(0.0, min(max_alt, cur_alt)))
-        self.lbl_alt_text.config(text=f"Current: {cur_alt:.1f} m   Ground: 0 m   Max: {max_alt:.0f} m")
-        if cur_alt >= 0.8 * max_alt:
-            self.alt_pb.configure(style="AltBarWarn.Horizontal.TProgressbar")
-        elif cur_alt >= 0.5 * max_alt:
-            self.alt_pb.configure(style="AltBarMid.Horizontal.TProgressbar")
-        else:
-            self.alt_pb.configure(style="AltBar.Horizontal.TProgressbar")
-        # Battery block
-        if self.node.battery_pct is not None:
-            pct = int(self.node.battery_pct * 100)
-            self.bat_pb["value"] = pct
-            self.lbl_bat_text.config(text=f"Charge: {pct}%   40.0V     ~ min")
-        else:
-            self.bat_pb["value"] = 0
-            self.lbl_bat_text.config(text="Charge: %   40.0V     ~ min")
-
-        # Power (placeholder unless you add topics)
-        self.lbl_power.config(text="Current:  A    Power:  W    Consumed:  mAh")
-
-        # Barometer block
-        if self.node.baro_pressure_pa is not None or self.node.temperature_c is not None:
-            pres = f"{self.node.baro_pressure_pa/100.0:.2f} hPa" if self.node.baro_pressure_pa else " hPa"
-            temp = f"{self.node.temperature_c:.1f} " if self.node.temperature_c is not None else " "
-            self.lbl_baro.config(text=f"Pressure: {pres}    Temperature: {temp}    Humidity: %")
-        else:
-            self.lbl_baro.config(text="Pressure:  hPa    Temperature:     Humidity: %")
-
-        # Mission statistics
-        trees = len(self.node.tree_positions_xy)
-        self.stat_card_trees.config(text=str(trees))
-        wpn = len(self.node.waypoints_xy)
-        self.stat_card_wp.config(text=f"{min(self.node.next_wp_idx, wpn)}/{wpn}")
-
-        trees_cut = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
-        self.stat_card_trees.config(text=str(trees_cut))
-
-        # Waypoints: reached / total
-        total_wps = len(self.node.waypoints_xy) if self.node.waypoints_xy else 0
-        reached = 0
-        if total_wps and self.node.position_xy is not None:
-            rx, ry = self.node.position_xy
-            # Count a waypoint as reached if we're within 1.0 m (adjust threshold as needed)
-            thr = 1.0
-            for (wx, wy) in self.node.waypoints_xy:
-                if math.hypot(rx - wx, ry - wy) <= thr:
-                    reached += 1
-        self.stat_card_wp.config(text=f"{reached}/{total_wps}")
-
-        # Status
-        self.lbl_status.config(text=("Status: E-STOPPED" if self.node.estop_active() else "Status: RUNNING"))
-
-        self.root.after(300, self.poll_telemetry)
+        except Exception as e:
+            # keep the loop alive; throttle spam
+            if not hasattr(self, "_pt_last_err") or (time.time() - getattr(self, "_pt_last_err", 0) > 2.0):
+                print("[poll_telemetry] error:", repr(e))
+                self._pt_last_err = time.time()
+        finally:
+            self.root.after(300, self.poll_telemetry)
 
 
 
@@ -1157,10 +1541,16 @@ class AppFigma:
         return d / (len(pts)-1) / 0.2
 
     def _metric_set(self, card, value, subtext):
-        for w in card.winfo_children():
-            w.destroy()
-        ttk.Label(card, text=value, style="MetricValue.TLabel").pack(anchor="w")
-        ttk.Label(card, text=subtext, style="MetricSub.TLabel").pack(anchor="w")
+        try:
+            card.val_lbl.config(text=value)
+            card.sub_lbl.config(text=subtext)
+        except Exception:
+            # fallback if an older card was created differently
+            for w in card.winfo_children():
+                w.destroy()
+            ttk.Label(card, text=value, style="MetricValue.TLabel").pack(anchor="w")
+            ttk.Label(card, text=subtext, style="MetricSub.TLabel").pack(anchor="w")
+
 
     def _select_altitude(self) -> Optional[float]:
         for v in (self.node._altitude_odom, self.node._altitude_gps, self.node._altitude_baro):

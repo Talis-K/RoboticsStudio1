@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 """
 Before launching this file run with:
     python3 src/41068_ignition_bringup/main.py 
@@ -13,7 +16,12 @@ Ensure all lines are run within the /RoboticsStudio1 directory in your bash term
 
 import rclpy
 import threading
+import rclpy
+import threading
 import time
+import numpy as np
+from rclpy.node import Node
+from rclpy.executors import MultiThreadedExecutor
 import numpy as np
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
@@ -165,6 +173,9 @@ class Mission(Node):
  
 
 def main():
+    """
+    ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
+    """
     """
     ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
     """
@@ -366,7 +377,10 @@ def main():
 
     finally:
         if rclpy.ok():
-            controller.stop()
+            try:
+                controller.stop()
+            except Exception:
+                pass
             controller.destroy_node()
             odom.destroy_node()
         rclpy.shutdown()
