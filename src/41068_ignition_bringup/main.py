@@ -347,7 +347,7 @@ def main():
     controller.create_subscription(Int32, '/people_count', _on_people_count, 10)
 
     def _on_stump_count(msg: Int32):
-        pub_stump_count.publish(Int32(data=msg.data))
+         pub_stump_count.publish(Int32(data=msg.data))
     controller.create_subscription(Int32, '/stump_count', _on_stump_count, 10)
 
 
