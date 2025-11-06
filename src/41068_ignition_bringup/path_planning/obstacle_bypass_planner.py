@@ -190,7 +190,7 @@ class ObstacleBypassPlanner(Node):
         # Perpendicular distance from circle centre to the infinite line through S→G
         # |(gy - sy)*cx - (gx - sx)*cy + gx*sy - gy*sx| / ||S→G||
         num = abs(seg_dy * cx - seg_dx * cy + gx * sy - gy * sx)
-        dist_line = num / seg_lenPoseStamped
+        dist_line = num / seg_len
 
         # Check whether the perpendicular foot lies within the segment bounds
         dot1 = (cx - sx) * seg_dx + (cy - sy) * seg_dy

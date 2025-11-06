@@ -189,12 +189,7 @@ def main():
     executor.add_node(lidar)
     executor.add_node(obj_avoidance)
     #----------------------------------------------------------------------
-    #------------- Spin executor in background thread (safe) --------------
-    spin_thread = threading.Thread(target=executor.spin, daemon=True)
-    spin_thread.start()
-    
     # --- Waypoint initialise + communication (pub/sub) ---
-
     # Waypoints
     waypoints = [(p[0], p[1]) for p in Goals().position()]
     waypoint_index = 0
@@ -225,6 +220,11 @@ def main():
     # Subscriber: listens for avoidance points (from obstacle avoidance node)
     controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
 
+    # ------------------ Publish initial waypoints ------------------------
+    pub_wp_total.publish(Int32(data=len(waypoints)))
+    pub_wp_array.publish(wp_array)
+    pub_wp_path.publish(wp_path)
+    # ---------------------------------------------------------------------
     #-----------------GUI and Estop------------------------------------------------------
 
     # Publishers (durable so GUI gets last values)
@@ -290,6 +290,12 @@ def main():
 
     # Initial GUI state
     pub_state.publish(String(data='IDLE'))
+
+    #------------- Spin executor in background thread (safe) --------------
+    spin_thread = threading.Thread(target=executor.spin, daemon=True)
+    spin_thread.start()
+    time.sleep(1.0)  # allow DDS discovery
+    #----------------------------------------------------------------------
 
     #----------------------Waypoints--------------------------
 
