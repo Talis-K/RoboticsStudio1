@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Before launching this file run with:
     python3 src/41068_ignition_bringup/main.py 
@@ -16,12 +13,7 @@ Ensure all lines are run within the /RoboticsStudio1 directory in your bash term
 
 import rclpy
 import threading
-import rclpy
-import threading
 import time
-import numpy as np
-from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
 import numpy as np
 from rclpy.node import Node
 from rclpy.executors import MultiThreadedExecutor
@@ -173,9 +165,6 @@ class Mission(Node):
  
 
 def main():
-    """
-    ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
-    """
     """
     ////// NODES, THREADING, WAYPOINT & MOVEMENT PROCESSING & SET UP //////
     """
@@ -334,6 +323,13 @@ def main():
     #----------------------------------------------------------------------
     #------------------------- Move to waypoints --------------------------
     try:
+        # Wait for "start" command
+        if not started_flag.is_set():
+            pub_state.publish(String(data='IDLE'))
+        while rclpy.ok() and (not started_flag.is_set()) and (not stop_flag.is_set()):
+            time.sleep(0.05)
+
+        total = len(waypoints)
         for i, wp in enumerate(waypoints):
             waypoint_index = i
             # Hard stop ends mission
@@ -361,13 +357,11 @@ def main():
 
             pub_wp_idx.publish(Int32(data=i + 1))
             print(f"[MAIN] Waypoint {i+1}: ({wp[0]:.2f}, {wp[1]:.2f})")
-
             # Publish the current waypoint being pursued
             msg = Float32MultiArray()
             msg.data = [float(wp[0]), float(wp[1])]
             current_waypoint_pub.publish(msg)
             Mission.move_to(controller, wp)
-            
 
         if total > 0:
             pub_prog.publish(Float32(data=1.0))
