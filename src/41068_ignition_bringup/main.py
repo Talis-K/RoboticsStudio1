@@ -30,10 +30,11 @@ from nav_msgs.msg import Path
 from rclpy.qos import QoSProfile, QoSDurabilityPolicy, ReliabilityPolicy, HistoryPolicy
 
 # --- Mission control flags (module-level so helpers can see them) ---
-estop_flag   = threading.Event()
-pause_flag   = threading.Event()
-started_flag = threading.Event()
-stop_flag    = threading.Event()
+estop_flag     = threading.Event()
+pause_flag     = threading.Event()
+started_flag   = threading.Event()
+stop_flag      = threading.Event()
+avoidance_flag = threading.Event()
 
 # Durable QoS for GUI state/waypoints
 transient_qos = QoSProfile(
@@ -83,6 +84,10 @@ class Mission(Node):
 
         while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
 
+            #obstical avoidance
+            if avoidance_flag.is_set():
+                return 
+            
             # pause hold
             if pause_flag.is_set():
                 time.sleep(0.05)
@@ -125,6 +130,11 @@ class Mission(Node):
         """
 
         while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
+
+            #obstical avoidance
+            if avoidance_flag.is_set():
+                return 
+
             # pause hold
             if pause_flag.is_set():
                 time.sleep(0.05)
@@ -200,18 +210,16 @@ def main():
     # Callback: updates avoidance waypoint list
     def avoidance_callback(msg: Float32MultiArray):
         nonlocal waypoints, waypoint_index
+
+        avoidance_flag.set()  # signal to stop current motion
+        controller.stop()
+
         # Expecting flat array [x1, y1, x2, y2, ...]
         data = np.array(msg.data, dtype=float).reshape(-1, 2)
         new_points = [(float(x), float(y)) for x, y in data]
 
         # Insert new waypoints before the current one
-        waypoints[waypoint_index:waypoint_index] = new_points  # slice insertion
-
-        started_flag.set()  # ensure mission continues
-        pause_flag.clear()  
-
-        # Stop current motion immediately
-        controller.stop()
+        waypoints[waypoint_index:waypoint_index] = new_points
 
         print(f"[MAIN] Injected {len(new_points)} avoidance waypoints at index {waypoint_index}.")
         for i, p in enumerate(waypoints):
@@ -219,12 +227,16 @@ def main():
 
     # Subscriber: listens for avoidance points (from obstacle avoidance node)
     controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
+    
+    # Publish waypoints as PoseArray + Path
+    wp_array = PoseArray()
+    wp_array.header.frame_id = 'odom'
+    wp_array.header.stamp = controller.get_clock().now().to_msg()
 
-    # ------------------ Publish initial waypoints ------------------------
-    pub_wp_total.publish(Int32(data=len(waypoints)))
-    pub_wp_array.publish(wp_array)
-    pub_wp_path.publish(wp_path)
-    # ---------------------------------------------------------------------
+    wp_path = Path()
+    wp_path.header.frame_id = 'odom'
+    wp_path.header.stamp = controller.get_clock().now().to_msg()
+
     #-----------------GUI and Estop------------------------------------------------------
 
     # Publishers (durable so GUI gets last values)
@@ -232,6 +244,12 @@ def main():
     pub_wp_idx   = controller.create_publisher(Int32,  '/mission/waypoint_index', transient_qos)
     pub_wp_array = controller.create_publisher(PoseArray, '/mission/waypoints', transient_qos)
     pub_wp_path  = controller.create_publisher(Path, '/mission/waypoints_path', transient_qos)
+
+    # ------------------ Publish initial waypoints ------------------------
+    pub_wp_total.publish(Int32(data=len(waypoints)))
+    pub_wp_array.publish(wp_array)
+    pub_wp_path.publish(wp_path)
+    # ---------------------------------------------------------------------
 
     for ev in (estop_flag, pause_flag, started_flag, stop_flag):
         ev.clear()
@@ -299,14 +317,6 @@ def main():
 
     #----------------------Waypoints--------------------------
 
-    # Publish waypoints as PoseArray + Path
-    wp_array = PoseArray()
-    wp_array.header.frame_id = 'odom'
-    wp_array.header.stamp = controller.get_clock().now().to_msg()
-
-    wp_path = Path()
-    wp_path.header.frame_id = 'odom'
-    wp_path.header.stamp = controller.get_clock().now().to_msg()
 
     for (x, y) in waypoints:
         ps = Pose()
@@ -369,6 +379,7 @@ def main():
             msg = Float32MultiArray()
             msg.data = [float(wp[0]), float(wp[1])]
             current_waypoint_pub.publish(msg)
+            avoidance_flag.clear()
             Mission.move_to(controller, wp)
 
         if total > 0:
