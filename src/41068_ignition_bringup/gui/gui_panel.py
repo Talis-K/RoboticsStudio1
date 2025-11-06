@@ -115,7 +115,7 @@ class GuiNode(Node):
 
         from std_msgs.msg import Int32
 
-        self.tree_count: int   = 0
+        self.tree_count: int   = 1
         self.people_count: int = 0
         self.stump_count: int   = 0
 
@@ -124,7 +124,7 @@ class GuiNode(Node):
         sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
         self.declare_parameter('legal_cut_count_topic',   '/mission/cuts_legal')
         self.declare_parameter('illegal_cut_count_topic', '/mission/cuts_illegal')
-        self.legal_cuts: int = 0
+        self.legal_cuts: int = 1
         self.illegal_cuts: int = 0
         lct = self.get_parameter('legal_cut_count_topic').get_parameter_value().string_value or ''
         ilct = self.get_parameter('illegal_cut_count_topic').get_parameter_value().string_value or ''
@@ -668,43 +668,52 @@ class GuiNode(Node):
                 pts.append((r * math.cos(ang), r * math.sin(ang)))
             ang += msg.angle_increment
 
-        # Transform to odom
-        src_frame   = msg.header.frame_id or 'laser'
-        target_frame = 'odom'
+        # Transform to od# Transform to a world frame
+        src_frame = (msg.header.frame_id or 'laser').lstrip('/')  # strip leading '/'
+        target_candidates = ['odom', 'map', 'base_link']          # try these in order
+        frame_used = src_frame
         world = False
-        try:
-            # Use latest transform instead of exact stamp to avoid extrapolation at takeoff
-            tfm = self.tf_buffer.lookup_transform(
-                target_frame, src_frame, Time(),  # latest available
-                timeout=Duration(seconds=0.25)    # give TF a bit more room
-            )
+
+        def _apply_tf(tfm, pts_local):
             tx = tfm.transform.translation.x
             ty = tfm.transform.translation.y
             q  = tfm.transform.rotation
             yaw = _yaw_from_quat(q.x, q.y, q.z, q.w)
-            cos_y, sin_y = math.cos(yaw), math.sin(yaw)
+            cy, sy = math.cos(yaw), math.sin(yaw)
+            out = []
+            for x, y in pts_local:
+                X = cy*x - sy*y + tx
+                Y = sy*x + cy*y + ty
+                out.append((X, Y))
+            return out
 
-            pts_world = []
-            for x, y in pts:
-                X = cos_y*x - sin_y*y + tx
-                Y = sin_y*x + cos_y*y + ty
-                pts_world.append((X, Y))
-            pts = pts_world
-            frame_used = target_frame
-            world = True
-        except (LookupException, ConnectivityException, ExtrapolationException):
-            # stay in sensor frame; we’ll draw with dynamic bounds
-            frame_used = src_frame
-            world = False
+        tf_ok = False
+        for tgt in target_candidates:
+            try:
+                # Latest available TF (time=0) and a more generous timeout
+                tfm = self.tf_buffer.lookup_transform(
+                    tgt, src_frame, Time(), timeout=Duration(seconds=0.5)
+                )
+                pts = _apply_tf(tfm, pts)
+                frame_used = tgt
+                world = True
+                tf_ok = True
+                break
+            except (LookupException, ConnectivityException, ExtrapolationException):
+                continue
+
+        # If no TF worked, we’ll keep points in sensor frame and let the drawer auto-fit
+
         try:
             self.msg_queue.put({
-                'src': 'scan',
-                'stamp': f"{msg.header.stamp.sec}.{str(msg.header.stamp.nanosec).zfill(9)}",
-                'frame': frame_used,
-                'n_total': len(pts),
-                'points_xy': pts,
-                'world': world, 
-            }, block=False)
+            'src': 'scan',
+            'stamp': f"{msg.header.stamp.sec}.{str(msg.header.stamp.nanosec).zfill(9)}",
+            'frame': frame_used,
+            'n_total': len(pts),
+            'points_xy': pts,
+            'world': world,
+        }, block=False)
+
 
         except queue.Full:
             pass
@@ -993,7 +1002,7 @@ class AppFigma:
         self.lbl_cam_info.pack(side=tk.LEFT)
         ttk.Label(cam_hdr, text=" AUTO Mode", style="BadgeGrey.TLabel",
                   image=self.icons.get("robot",14), compound="left").pack(side=tk.RIGHT)
-        self.cam_label = ttk.Label(cam, text="Camera Stream Active",
+        self.cam_label = ttk.Label(cam, text="Camera Stream InActive",
                                    style="CardMutedCenter.TLabel", anchor="center")
         self.cam_label.pack(fill="both", expand=True, pady=8)
 
@@ -1012,7 +1021,7 @@ class AppFigma:
 
         # Right: flight mode chip (dynamic)
         #self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
-        self._mode_chip = self._chip(ctl_hdr, "PAUSED", bg="#FFF6E6", fg="#9A6B00", hover_bg="#FFEBC7")
+        self._mode_chip = self._chip(ctl_hdr, "Running", bg="#33992F", fg="#A4E7AF", hover_bg="#9DE68E")
 
         # Body (your existing content)
         ctl_body = ttk.Frame(ctl, style="Card.TFrame", padding=(6, 8))
@@ -1105,7 +1114,7 @@ class AppFigma:
 
 
 
-        self.lbl_status = ttk.Label(ctl, text="Status: STOPPED", style="BadgeGrey.TLabel")
+        self.lbl_status = ttk.Label(ctl, text="Status: Started", style="BadgeGrey.TLabel")
         self.lbl_status.pack(anchor="w", pady=(8,0))
 
         # (C) LiDAR map (bottom-left)
