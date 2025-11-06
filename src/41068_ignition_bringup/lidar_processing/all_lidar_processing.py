@@ -9,7 +9,7 @@ import numpy as np
 
 class LidarDetection(Node):
     def __init__(self):
-        super().__init__('filtered_lidar_node')
+        super().__init__('lidar_processing_node')
 
         # Subscribers
         self.subscription = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)

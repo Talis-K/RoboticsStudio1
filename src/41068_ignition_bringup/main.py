@@ -22,6 +22,7 @@ from drone_control.dronecontrolling  import DroneController
 from path_planning.snake_path        import Goals
 from drone_control.odometry_listener import OdometryListener
 from lidar_processing.all_lidar_processing import LidarDetection
+from path_planning.new import ObstacleBypassPlanner
 
 from std_msgs.msg import Int32, Bool, String, Float32, Float32MultiArray
 from geometry_msgs.msg import PoseArray, Pose, PoseStamped
@@ -177,6 +178,7 @@ def main():
 
     controller = DroneController()
     lidar  = LidarDetection()
+    obj_avoidance = ObstacleBypassPlanner()
 
     #---------------------- Executor for all nodes ------------------------
     executor = MultiThreadedExecutor(num_threads=4) #Runs callbacks in a pool of threads
@@ -185,6 +187,7 @@ def main():
     executor.add_node(odom)
     executor.add_node(controller)
     executor.add_node(lidar)
+    executor.add_node(obj_avoidance)
     #----------------------------------------------------------------------
     #------------- Spin executor in background thread (safe) --------------
     spin_thread = threading.Thread(target=executor.spin, daemon=True)
@@ -198,9 +201,6 @@ def main():
 
     # Publisher: current waypoint being targeted
     current_waypoint_pub = controller.create_publisher(Float32MultiArray, '/current_waypoint', 10)
-
-    # Subscriber: listens for avoidance points (from obstacle avoidance node)
-    controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
 
     # Callback: updates avoidance waypoint list
     def avoidance_callback(msg: Float32MultiArray):
@@ -218,11 +218,12 @@ def main():
         # Stop current motion immediately
         controller.stop()
 
-
         print(f"[MAIN] Injected {len(new_points)} avoidance waypoints at index {waypoint_index}.")
         for i, p in enumerate(waypoints):
             print(f"  [{i}] ({p[0]:.2f}, {p[1]:.2f})")
 
+    # Subscriber: listens for avoidance points (from obstacle avoidance node)
+    controller.create_subscription(Float32MultiArray, '/avoidance_waypoints', avoidance_callback, 10)
 
     #-----------------GUI and Estop------------------------------------------------------
 
@@ -238,6 +239,7 @@ def main():
     pub_state = controller.create_publisher(String,  '/mission/state', transient_qos)
     pub_prog  = controller.create_publisher(Float32, '/mission/progress', 10)
 
+  
     # E-STOP subscriber
     def _on_estop(msg: Bool):
         if bool(msg.data):

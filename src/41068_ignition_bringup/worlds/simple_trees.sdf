@@ -101,7 +101,7 @@
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
       </uri>
       <name>pine4</name>
-      <pose>-3.5 -4.0 0 0 0 0</pose>
+      <pose>-4 -4.0 0 0 0 0</pose>
     </include>
 
 <!-- Walking Person -->
