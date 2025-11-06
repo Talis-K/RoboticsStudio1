@@ -120,8 +120,12 @@ class GuiNode(Node):
         tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
         pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
         sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
-
-
+        self.declare_parameter('legal_cut_count_topic',   '/mission/cuts_legal')
+        self.declare_parameter('illegal_cut_count_topic', '/mission/cuts_illegal')
+        self.legal_cuts: int = 0
+        self.illegal_cuts: int = 0
+        lct = self.get_parameter('legal_cut_count_topic').get_parameter_value().string_value or ''
+        ilct = self.get_parameter('illegal_cut_count_topic').get_parameter_value().string_value or ''
 
 
         if tct:
@@ -130,7 +134,10 @@ class GuiNode(Node):
             self.create_subscription(Int32, pct, lambda m: setattr(self, 'people_count', int(m.data)), qos_transient)
         if sct:
             self.create_subscription(Int32, sct, lambda m: setattr(self, 'stump_count', int(m.data)), qos_transient)
-
+        if lct:
+            self.create_subscription(Int32, lct, lambda m: setattr(self, 'legal_cuts', int(m.data)), qos_transient)
+        if ilct:
+            self.create_subscription(Int32, ilct, lambda m: setattr(self, 'illegal_cuts', int(m.data)), qos_transient)
 
         # Subscriptions
         scan_topic = self.get_parameter('scan_topic').get_parameter_value().string_value
@@ -909,6 +916,11 @@ class AppFigma:
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
         self.tree_people_var = tk.StringVar(value="People: 0")
+        # Inline (to the right of the big number)
+        self.tree_cuts_var = tk.StringVar(value="Legal: 0 | Illegal: 0")
+        self._add_inline_right_of_value(self.card_tree, self.tree_cuts_var)
+
+
         self._add_footer_counter(self.card_tree, self.tree_people_var)
         self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
@@ -1313,7 +1325,12 @@ class AppFigma:
         card.footer_people_lbl = lbl
 
 
-       
+    def _add_footer_left(self, card, var: tk.StringVar):
+        """Small label in the bottom-left corner of a metric card."""
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        lbl.place(relx=0.0, rely=1.0, anchor="sw", x=10, y=-8)  # bottom-left
+        card.footer_left_lbl = lbl
+
 
 
     def _pill(self, parent, text, color, cb, payload, outline=False, icon=None):
@@ -1436,6 +1453,14 @@ class AppFigma:
             )
         self.root.after(40, self.poll_scan)
 
+    def _add_inline_right_of_value(self, card, var: tk.StringVar):
+        """Attach a small label just to the right of the big value number."""
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        # Place relative to the big value label so it hugs its right edge
+        lbl.place(in_=card.val_lbl, relx=1.0, rely=0.55, x=12, anchor="w")
+        card.inline_right_lbl = lbl
+
+
     def poll_telemetry(self):
         try:
             # Top bar
@@ -1481,6 +1506,10 @@ class AppFigma:
             if avg_h is not None:
                 footer += f"  (avg h≈{avg_h:.2f} m)"
             self.tree_people_var.set(footer)
+            legal  = getattr(self.node, 'legal_cuts', 0)
+            illegal = getattr(self.node, 'illegal_cuts', 0)
+            self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(illegal)}")
+
 
 
 
