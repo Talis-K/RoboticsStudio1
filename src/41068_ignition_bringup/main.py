@@ -65,7 +65,7 @@ _obst_lock = Lock()
 # Tunables for avoidance
 DRONE_RADIUS = 0.25     # m (conservative)
 SAFETY_MARGIN = 0.25    # m (inflate obstacles by this)
-LOOKAHEAD = 12.0         # m (only consider obstacles within this distance from current pose)
+LOOKAHEAD = 9.0         # m (only consider obstacles within this distance from current pose)
 LINE_CLEAR_EXTRA = 0.10 # m (require this extra clearance beyond inflated radius)
 MAX_SUBGOALS = 3       # avoid infinite detours
 
@@ -73,7 +73,7 @@ MAX_SUBGOALS = 3       # avoid infinite detours
 def _now_s() -> float:
     return time.time()
 
-def _forward_cone_blocked(pose, obstacles, cone_deg=40.0, stop_dist=2.9) -> bool:
+def _forward_cone_blocked(pose, obstacles, cone_deg=50.0, stop_dist=3.2) -> bool:
     """
     True if an inflated obstacle center is inside a yaw-centered cone within stop_dist.
     """
@@ -89,6 +89,33 @@ def _forward_cone_blocked(pose, obstacles, cone_deg=40.0, stop_dist=2.9) -> bool
                 return True
     return False
 
+def _min_obst_distance(p, obstacles):
+    """Minimum clearance (center distance minus inflated R)."""
+    px, py = p
+    best = 1e9
+    for (cx, cy, R) in obstacles:
+        d = hypot(cx - px, cy - py) - R
+        if d < best:
+            best = d
+    return best
+
+def _escape_manoeuvre(controller, pose, *, side='left', lat=0.7, back=0.35, v=0.45):
+    """
+    Quick 'unstick': lateral sidestep then a tiny reverse to open space.
+    Requires move_y() to be implemented (you have it).
+    """
+    sign = +1.0 if side == 'left' else -1.0
+    # 1) lateral nudge
+    t_lat = max(0.15, lat / max(v, 1e-3))
+    controller.move_y(sign * v, t_lat)
+    controller.start()
+    Mission.wait_motion_finish(controller)
+    # 2) short backtrack
+    if back > 0.0:
+        t_back = back / max(v, 1e-3)
+        controller.move_x(-v, t_back)
+        controller.start()
+        Mission.wait_motion_finish(controller)
 
 def _snapshot_obstacles() -> List[Tuple[float, float, float]]:
     """Return [(cx,cy,R_inflated), ...] fresh obstacles."""
@@ -252,6 +279,13 @@ class Mission(Node):
         """Translate toward 'target' in XY, aligning yaw first; obey pause/E-STOP."""
 
         subgoals_done = 0
+        last_brake_ts = 0.0
+        brake_cooldown = 0.35      # don’t re-brake instantly
+        consec_brakes  = 0         # count repeated brakes at the same spot
+        MAX_BRAKES_BEFORE_ESCAPE = 3
+        last_progress_check = time.time()
+        last_progress_dist  = 1e9  # distance to goal at last check
+
         while rclpy.ok(): #Loops only while ROS is running, prevents hanging on shutdown.
         #---------------------- GUI Pause engaged check -----------------------
             if pause_flag.is_set():
