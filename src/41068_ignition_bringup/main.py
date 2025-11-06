@@ -63,15 +63,32 @@ _obstacles: List[Tuple[float, float, float, float]] = []  # (cx,cy,r,timestamp)
 _obst_lock = Lock()
 
 # Tunables for avoidance
-DRONE_RADIUS = 0.20     # m (conservative)
-SAFETY_MARGIN = 0.35    # m (inflate obstacles by this)
-LOOKAHEAD = 6.0         # m (only consider obstacles within this distance from current pose)
-LINE_CLEAR_EXTRA = 0.15 # m (require this extra clearance beyond inflated radius)
-MAX_SUBGOALS = 5       # avoid infinite detours
+DRONE_RADIUS = 0.25     # m (conservative)
+SAFETY_MARGIN = 0.25    # m (inflate obstacles by this)
+LOOKAHEAD = 12.0         # m (only consider obstacles within this distance from current pose)
+LINE_CLEAR_EXTRA = 0.10 # m (require this extra clearance beyond inflated radius)
+MAX_SUBGOALS = 3       # avoid infinite detours
 
 
 def _now_s() -> float:
     return time.time()
+
+def _forward_cone_blocked(pose, obstacles, cone_deg=40.0, stop_dist=2.9) -> bool:
+    """
+    True if an inflated obstacle center is inside a yaw-centered cone within stop_dist.
+    """
+    px, py, yaw = float(pose[0]), float(pose[1]), float(pose[5])
+    half = float(np.deg2rad(cone_deg) / 2.0)
+    for (cx, cy, R) in obstacles:
+        dx, dy = cx - px, cy - py
+        d = hypot(dx, dy)
+        if d <= max(stop_dist, R):  # close enough to worry
+            ang = atan2(dy, dx)
+            off = abs(np.arctan2(np.sin(ang - yaw), np.cos(ang - yaw)))
+            if off <= half:
+                return True
+    return False
+
 
 def _snapshot_obstacles() -> List[Tuple[float, float, float]]:
     """Return [(cx,cy,R_inflated), ...] fresh obstacles."""
@@ -278,8 +295,10 @@ class Mission(Node):
             if distance <= max(1e-3, float(tolerance)):
                 return
 
-            obs_list = _snapshot_obstacles()  # [(cx,cy,R_inflated), ...]
+            obs_list = _snapshot_obstacles()
             blocker  = _first_blocking_obstacle(cur, goal, obs_list)
+
+
 
                         # --- NEW: if blocked and we still have budget, visit a tangent sub-goal first
             if blocker and subgoals_done < MAX_SUBGOALS:
@@ -312,6 +331,12 @@ class Mission(Node):
                         Mission.rotate(controller, pose2, sub[0]-cur2[0], sub[1]-cur2[1])
                         v = min(speed, max(0.15, dsub/6.0))      # gentle near subgoal
                         duration = max(0.05, (dsub / max(v,1e-3)) / 2.0)
+                        # Emergency forward cone brake
+                        if _forward_cone_blocked(pose if 'pose2' not in locals() else pose2, obs_list, cone_deg=50.0, stop_dist=1.2):
+                            try: controller.stop()
+                            except Exception: pass
+                            time.sleep(0.1)
+                            continue  # re-evaluate instead of committing to motion
 
                         controller.move_x(v, duration)
                         controller.start()
@@ -336,6 +361,13 @@ class Mission(Node):
             if distance < 1.5:
                 v = max(0.15, distance/6.0)              # slow near goal
             duration = max(0.05, (distance / max(v,1e-3)) / 2.0)  # clamp
+            # Emergency forward cone brake
+            if _forward_cone_blocked(pose if 'pose2' not in locals() else pose2, obs_list, cone_deg=50.0, stop_dist=1.2):
+                try: controller.stop()
+                except Exception: pass
+                time.sleep(0.1)
+                continue  # re-evaluate instead of committing to motion
+
 
             controller.move_x(v, duration)
             controller.start()
