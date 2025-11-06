@@ -9,9 +9,16 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(ros_ign_interfaces REQUIRED)
 
+# Install the Python module subpackage 
+ament_python_install_package(chainsaw_detector2)
+
+
 # Install executable scripts
 install(PROGRAMS
   gui/gui_panel.py
+  chainsaw_detector2/chainsaw_detector_node.py 
+  chainsaw_detector2/test_audio_publisher.py
+  main.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

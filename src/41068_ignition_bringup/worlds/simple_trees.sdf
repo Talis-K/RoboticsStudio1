@@ -110,6 +110,16 @@
       <name>human1</name>
       <pose>-2 0 0 0 0 0</pose>
     </include>
+    <include>
+      <uri>model://walking_person</uri>
+      <name>human2</name>
+      <pose>2.5 3 0 0 0 1.2</pose>
+    </include>
+    <include>
+      <uri>model://walking_person</uri>
+      <name>human3</name>
+      <pose>4 -5 0 0 0 2.0</pose>
+    </include>
 
   </world>
 </sdf>
