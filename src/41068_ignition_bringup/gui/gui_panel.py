@@ -19,6 +19,8 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from rclpy.duration import Duration
+from rclpy.time import Time
+
 
 from PIL import Image as PILImage
 from PIL import ImageTk
@@ -80,8 +82,12 @@ class GuiNode(Node):
         self.declare_parameter('altitude_mode', 'auto')
         self.declare_parameter('altitude_topic', '')
 
-     
+        self.declare_parameter('tree_count_topic',   '/mission/tree_count')
+        self.declare_parameter('people_count_topic', '/mission/people_count')
+        
 
+     
+        self.declare_parameter('stump_count_topic', '/mission/stump_count')
         self.declare_parameter('detections_topic', '/trees/cut')
 
         #Audio Detetction
@@ -106,6 +112,34 @@ class GuiNode(Node):
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
         )
 
+
+        from std_msgs.msg import Int32
+
+        self.tree_count: int   = 1
+        self.people_count: int = 0
+        self.stump_count: int   = 0
+
+        tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
+        pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
+        sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
+        self.declare_parameter('legal_cut_count_topic',   '/mission/cuts_legal')
+        self.declare_parameter('illegal_cut_count_topic', '/mission/cuts_illegal')
+        self.legal_cuts: int = 1
+        self.illegal_cuts: int = 0
+        lct = self.get_parameter('legal_cut_count_topic').get_parameter_value().string_value or ''
+        ilct = self.get_parameter('illegal_cut_count_topic').get_parameter_value().string_value or ''
+
+
+        if tct:
+            self.create_subscription(Int32, tct, lambda m: setattr(self, 'tree_count', int(m.data)), qos_transient)
+        if pct:
+            self.create_subscription(Int32, pct, lambda m: setattr(self, 'people_count', int(m.data)), qos_transient)
+        if sct:
+            self.create_subscription(Int32, sct, lambda m: setattr(self, 'stump_count', int(m.data)), qos_transient)
+        if lct:
+            self.create_subscription(Int32, lct, lambda m: setattr(self, 'legal_cuts', int(m.data)), qos_transient)
+        if ilct:
+            self.create_subscription(Int32, ilct, lambda m: setattr(self, 'illegal_cuts', int(m.data)), qos_transient)
 
         # Subscriptions
         scan_topic = self.get_parameter('scan_topic').get_parameter_value().string_value
@@ -218,6 +252,8 @@ class GuiNode(Node):
         self.declare_parameter('chainsaw_high_hz',400.0)
         self.declare_parameter('audio_conf_thresh', 0.55)
         self.declare_parameter('audio_decision_window', 5)
+
+        
         # Waypoints
         self.declare_parameter('waypoints_path_topic',  '/mission/waypoints_path')
         self.declare_parameter('waypoints_array_topic', '/mission/waypoints')
@@ -298,6 +334,9 @@ class GuiNode(Node):
             self.create_subscription(Temperature, tpc, self.on_temperature, 10)
 
 
+
+
+
         dt = self.get_parameter('detections_topic').get_parameter_value().string_value
         if dt:
             self.create_subscription(PoseArray, dt, self.on_tree_detections, 10)
@@ -327,6 +366,21 @@ class GuiNode(Node):
             )
         )
 
+    def on_stumps(self, msg: Float32MultiArray):
+        """
+        Accepts a single stump per message: [x, y, r, h_lb].
+        If you publish batches, loop over chunks of 4 before appending.
+        """
+        try:
+            data = list(msg.data)
+            if len(data) >= 4:
+                x, y, r, h = map(float, data[:4])
+                self.stumps.append((x, y, r, h))
+                # keep memory bounded
+                if len(self.stumps) > 500:
+                    self.stumps = self.stumps[-500:]
+        except Exception:
+            pass
 
     def _on_wp_idx(self, v):   self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
@@ -614,37 +668,53 @@ class GuiNode(Node):
                 pts.append((r * math.cos(ang), r * math.sin(ang)))
             ang += msg.angle_increment
 
-        # Transform to odom
-        src_frame = msg.header.frame_id or 'laser'
-        target_frame = 'odom'
-        try:
-            tfm = self.tf_buffer.lookup_transform(
-                target_frame, src_frame, msg.header.stamp, timeout=Duration(seconds=0.05)
-            )
+        # Transform to od# Transform to a world frame
+        src_frame = (msg.header.frame_id or 'laser').lstrip('/')  # strip leading '/'
+        target_candidates = ['odom', 'map', 'base_link']          # try these in order
+        frame_used = src_frame
+        world = False
+
+        def _apply_tf(tfm, pts_local):
             tx = tfm.transform.translation.x
             ty = tfm.transform.translation.y
-            q = tfm.transform.rotation
+            q  = tfm.transform.rotation
             yaw = _yaw_from_quat(q.x, q.y, q.z, q.w)
-            cos_y, sin_y = math.cos(yaw), math.sin(yaw)
+            cy, sy = math.cos(yaw), math.sin(yaw)
+            out = []
+            for x, y in pts_local:
+                X = cy*x - sy*y + tx
+                Y = sy*x + cy*y + ty
+                out.append((X, Y))
+            return out
 
-            pts_world = []
-            for x, y in pts:
-                X = cos_y*x - sin_y*y + tx
-                Y = sin_y*x + cos_y*y + ty
-                pts_world.append((X, Y))
-            pts = pts_world
-            frame_used = target_frame
-        except (LookupException, ConnectivityException, ExtrapolationException):
-            frame_used = src_frame
+        tf_ok = False
+        for tgt in target_candidates:
+            try:
+                # Latest available TF (time=0) and a more generous timeout
+                tfm = self.tf_buffer.lookup_transform(
+                    tgt, src_frame, Time(), timeout=Duration(seconds=0.5)
+                )
+                pts = _apply_tf(tfm, pts)
+                frame_used = tgt
+                world = True
+                tf_ok = True
+                break
+            except (LookupException, ConnectivityException, ExtrapolationException):
+                continue
+
+        # If no TF worked, we’ll keep points in sensor frame and let the drawer auto-fit
 
         try:
             self.msg_queue.put({
-                'src': 'scan',
-                'stamp': f"{msg.header.stamp.sec}.{str(msg.header.stamp.nanosec).zfill(9)}",
-                'frame': frame_used,
-                'n_total': len(pts),
-                'points_xy': pts
-            }, block=False)
+            'src': 'scan',
+            'stamp': f"{msg.header.stamp.sec}.{str(msg.header.stamp.nanosec).zfill(9)}",
+            'frame': frame_used,
+            'n_total': len(pts),
+            'points_xy': pts,
+            'world': world,
+        }, block=False)
+
+
         except queue.Full:
             pass
 
@@ -863,6 +933,13 @@ class AppFigma:
         metrics.pack(side=tk.TOP, fill=tk.X)
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
+        self.tree_people_var = tk.StringVar(value="People: 0")
+        # Inline (to the right of the big number)
+        self.tree_cuts_var = tk.StringVar(value="Legal: 0 | Illegal: 0")
+        self._add_inline_right_of_value(self.card_tree, self.tree_cuts_var)
+
+
+        self._add_footer_counter(self.card_tree, self.tree_people_var)
         self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
         self.card_home    = self._metric_card(metrics, "Home Dist",  "-- m",    "Within bounds",     3, icon=("home",16))
@@ -925,7 +1002,7 @@ class AppFigma:
         self.lbl_cam_info.pack(side=tk.LEFT)
         ttk.Label(cam_hdr, text=" AUTO Mode", style="BadgeGrey.TLabel",
                   image=self.icons.get("robot",14), compound="left").pack(side=tk.RIGHT)
-        self.cam_label = ttk.Label(cam, text="Camera Stream Active",
+        self.cam_label = ttk.Label(cam, text="Camera Stream InActive",
                                    style="CardMutedCenter.TLabel", anchor="center")
         self.cam_label.pack(fill="both", expand=True, pady=8)
 
@@ -944,7 +1021,7 @@ class AppFigma:
 
         # Right: flight mode chip (dynamic)
         #self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
-        self._mode_chip = self._chip(ctl_hdr, "PAUSED", bg="#FFF6E6", fg="#9A6B00", hover_bg="#FFEBC7")
+        self._mode_chip = self._chip(ctl_hdr, "Running", bg="#33992F", fg="#A4E7AF", hover_bg="#9DE68E")
 
         # Body (your existing content)
         ctl_body = ttk.Frame(ctl, style="Card.TFrame", padding=(6, 8))
@@ -1037,7 +1114,7 @@ class AppFigma:
 
 
 
-        self.lbl_status = ttk.Label(ctl, text="Status: STOPPED", style="BadgeGrey.TLabel")
+        self.lbl_status = ttk.Label(ctl, text="Status: Started", style="BadgeGrey.TLabel")
         self.lbl_status.pack(anchor="w", pady=(8,0))
 
         # (C) LiDAR map (bottom-left)
@@ -1172,6 +1249,8 @@ class AppFigma:
         style.configure('.', background=bg, foreground=fg, font=("SF Pro Text", 11))
         style.configure('Bg.TFrame', background=bg)
         style.configure('Topbar.TFrame', background=card)
+        style.configure('MutedSmall.TLabel',
+    background=card, foreground=muted, font=("SF Pro Text", 9))
         style.configure('Card.TFrame', background=card)
         style.configure('Card.TLabelframe', background=card, relief='solid', borderwidth=1)
         style.configure('Card.TLabelframe.Label', background=card, foreground=muted, font=("SF Pro Text", 10, 'bold'))
@@ -1240,7 +1319,7 @@ class AppFigma:
         return frame
 
     def _metric_card(self, parent, title, value, sub, idx, icon=None):
-        card = ttk.Labelframe(parent, text=title, padding=(12,8), style="Card.TLabelframe")
+        card = ttk.Labelframe(parent, text=title, padding=(12,8, 6, 0), style="Card.TLabelframe")
         card.grid(row=0, column=idx, sticky="nsew", padx=8, pady=(4,8))
         parent.grid_columnconfigure(idx, weight=1)
 
@@ -1256,8 +1335,20 @@ class AppFigma:
         card.val_lbl = ttk.Label(card, text=value, style="MetricValue.TLabel")
         card.sub_lbl = ttk.Label(card, text=sub,   style="MetricSub.TLabel")
         card.val_lbl.pack(anchor="w", pady=(2,0))
-        card.sub_lbl.pack(anchor="w")
+        card.sub_lbl.pack(anchor="w", pady=(0, 6))
         return card
+    def _add_footer_counter(self, card, var: tk.StringVar):
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)  # was y=-8; either is fine now
+        card.footer_people_lbl = lbl
+
+
+    def _add_footer_left(self, card, var: tk.StringVar):
+        """Small label in the bottom-left corner of a metric card."""
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        lbl.place(relx=0.0, rely=1.0, anchor="sw", x=10, y=-8)  # bottom-left
+        card.footer_left_lbl = lbl
+
 
 
     def _pill(self, parent, text, color, cb, payload, outline=False, icon=None):
@@ -1286,6 +1377,8 @@ class AppFigma:
     
     def _safe_has(self, name: str) -> bool:
         return hasattr(self, name) and getattr(self, name) is not None
+
+  
 
 
     def _mini_stat(self, parent, title, value, icon=None):
@@ -1371,12 +1464,22 @@ class AppFigma:
             self.redraw_scatter(
                 pts,
                 clusters,
-                src=item.get('src', ''),
-                frame=item.get('frame', ''),
-                stamp=item.get('stamp', ''),
-                n=item.get('n_total', '')
+                src=item.get('src',''),
+                frame=item.get('frame',''),
+                stamp=item.get('stamp',''),
+                n=item.get('n_total',''),
+                world=item.get('world', True)  # NEW
             )
+
         self.root.after(40, self.poll_scan)
+
+    def _add_inline_right_of_value(self, card, var: tk.StringVar):
+        """Attach a small label just to the right of the big value number."""
+        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
+        # Place relative to the big value label so it hugs its right edge
+        lbl.place(in_=card.val_lbl, relx=1.0, rely=0.55, x=12, anchor="w")
+        card.inline_right_lbl = lbl
+
 
     def poll_telemetry(self):
         try:
@@ -1389,8 +1492,46 @@ class AppFigma:
             # --- Metric cards you actually have: tree, audio, speed, home, time, waypts ---
 
             # Tree count (from PoseArray of detections)
-            trees = len(self.node.tree_positions_xy) if self.node.tree_positions_xy else 0
-            self._metric_set(self.card_tree, str(trees), "Detected Trees")
+            # --- Trees (prefer count topic, else fallback to positions) ---
+            trees_via_topic = getattr(self.node, 'tree_count', None)
+            if isinstance(trees_via_topic, (int, float)) and trees_via_topic >= 0:
+                self._metric_set(self.card_tree, str(int(trees_via_topic)), "Detected Trees")
+            else:
+                trees = len(self.node.tree_positions_xy) if getattr(self.node, 'tree_positions_xy', None) else 0
+                self._metric_set(self.card_tree, str(trees), "Detected Trees")
+
+            # --- People (prefer count topic, else fallback to any stored positions list if you have one) ---
+            people = getattr(self.node, 'people_count', None)
+            if people is None:
+                people = len(getattr(self.node, 'people_positions_xy', []))  # safe if you don't have it
+            people = int(people)
+
+            # --- Stumps (prefer count topic, else fallback to local stumps list) ---
+            stumps_via_topic = getattr(self.node, 'stump_count', None)  # create this topic later if you like
+            if isinstance(stumps_via_topic, (int, float)) and stumps_via_topic >= 0:
+                stumps = int(stumps_via_topic)
+            else:
+                stumps = len(getattr(self.node, 'stumps', []))
+
+            # Optional: average stump height label if you’re publishing [x,y,r,h] and keeping self.node.stumps
+            avg_h = None
+            try:
+                if stumps and getattr(self.node, 'stumps', None):
+                    avg_h = sum(h for (_, _, _, h) in self.node.stumps) / len(self.node.stumps)
+            except Exception:
+                avg_h = None
+
+            # --- Footer text on the Tree card ---
+            footer = f"People: {people}| Stumps: {stumps}"
+            if avg_h is not None:
+                footer += f"  (avg h≈{avg_h:.2f} m)"
+            self.tree_people_var.set(footer)
+            legal  = getattr(self.node, 'legal_cuts', 0)
+            illegal = getattr(self.node, 'illegal_cuts', 0)
+            self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(stumps)}")
+
+
+
 
             # Audio / chainsaw detector
             if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
@@ -1617,7 +1758,13 @@ class AppFigma:
                 return step
         return 10 * mag
 
-    def redraw_scatter(self, pts_xy: List[Tuple[float, float]], clusters: List[List[Tuple[float, float]]], *, src: str, frame: str, stamp: str, n: int):
+    def redraw_scatter(self, pts_xy: List[Tuple[float, float]], clusters: List[List[Tuple[float, float]]], *, src: str, frame: str, stamp: str, n: int, world=True):
+        if world and self._fixed_view and (self.node.position_xy is not None):
+            x0, x1, y0, y1 = self._compute_bounds([], [])  # will use fixed range around robot
+        else:
+            x0, x1, y0, y1 = self._compute_bounds(pts_xy, clusters)
+                
+        
         x0, x1, y0, y1 = self._compute_bounds(pts_xy, clusters)
         if self._static_bounds != (x0, x1, y0, y1):
             self._draw_static_grid(x0, x1, y0, y1)

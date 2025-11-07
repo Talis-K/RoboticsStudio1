@@ -9,7 +9,7 @@ import numpy as np
 
 class LidarDetection(Node):
     def __init__(self):
-        super().__init__('lidar_processing_node')
+        super().__init__('filtered_lidar_node')
 
         # Subscribers
         self.subscription = self.create_subscription(LaserScan, '/scan', self.lidar_callback, 10)
@@ -21,13 +21,23 @@ class LidarDetection(Node):
         self.people_pub = self.create_publisher(Float32MultiArray, '/people', 10) # publishes detected people
         self.tree_count_pub = self.create_publisher(Int32, '/tree_count', 10) # publishes number of detected trees
         self.people_count_pub = self.create_publisher(Int32, '/people_count', 10) # publishes number of detected people 
-
+        self.stump_pub = self.create_publisher(Float32MultiArray, '/stumps', 10)       # [x,y,r] one per msg (live)
+        self.stump_count_pub = self.create_publisher(Int32, '/stump_count', 10)        # count per scan
 
         # Parameters
         self.min_cluster_size = 5 # minimum number of points to identify a cluster
         self.max_point_dist = 0.13 # maximum distance consecutive points can be from one another to not break the chain of points
         self.min_centroid_dist = 1 # minimum distance cluster centroids must be apart from one anotehr to identify as new cluster
         self.human_leg_dist = 0.3 # maximum distance two cluster can be apart from one anotehr to identify as human
+
+
+        #Paramters for Tree Stump
+        self.stump_radius_min = 0.10   # m  (small posts/rocks will be < this)
+        self.stump_radius_max = 0.9   # m  (most trunk cut stumps < 0.45)
+        self.stump_min_points = 10     # tighter than generic cluster to ensure shape quality
+        self.stump_max_mean_resid = 0.055  # m, mean absolute residual from circle fit
+        self.stump_max_std_resid  = 0.055 # m, residual std dev
+        self.stump_min_roundness  = 0.2  # unitless, 1.0 is perfectly round
 
         # Odometry
         self.current_pose = {'x': 0.0, 'y': 0.0, 'yaw': 0.0} # initial odom with zeros
@@ -37,6 +47,8 @@ class LidarDetection(Node):
         self.people = []     # Detected humans
         self.geometries = [] # all published geometries
         self.scan_index = 0  # Incremented each scan
+        self.stumps = []  # detected stumps
+
 
         self.get_logger().info('LidarDetection initialized with persistent cluster/human tracking.') #initialisation log
 
@@ -51,6 +63,27 @@ class LidarDetection(Node):
         siny_cosp = 2 * (q.w * q.z + q.x * q.y)
         cosy_cosp = 1 - 2 * (q.y**2 + q.z**2)
         self.current_pose['yaw'] = np.arctan2(siny_cosp, cosy_cosp)
+
+   # ===============================
+    # Stump Detetcion
+    # ===============================
+
+    def _circle_quality(self, points, cx, cy, r):
+        """
+        Returns (mean_abs_resid, std_resid, roundness) for how 'disk-like' a cluster is.
+        - roundness ~ 1.0 means distances from centroid are very close to r.
+        """
+        if len(points) < 3:
+            return 1e9, 1e9, 0.0
+        d = np.linalg.norm(points - np.array([cx, cy]), axis=1)
+        resid = np.abs(d - r)
+        mean_abs = float(np.mean(resid))
+        std = float(np.std(resid))
+        # Roundness: 1 - normalized variance of distances (clamped to [0,1])
+        # Use r as scale to keep it size-invariant; add small epsilon to avoid div/0
+        eps = 1e-6 + abs(r)
+        roundness = max(0.0, min(1.0, 1.0 - (np.var(d) / (eps**2))))
+        return mean_abs, std, roundness
 
     # ===============================
     # Lidar callback
@@ -94,6 +127,11 @@ class LidarDetection(Node):
         people_count_msg.data = len(self.people)
         self.people_count_pub.publish(people_count_msg)
 
+        stump_count_msg = Int32()
+        stump_count_msg.data = len(self.stumps)
+        self.stump_count_pub.publish(stump_count_msg)
+
+
     # ===============================
     # Cluster detection
     # ===============================
@@ -129,11 +167,13 @@ class LidarDetection(Node):
                 # Merge last and first clusters
                 merged_points = np.vstack((last_cluster['points'], first_cluster['points']))
                 cx, cy, radius = self.fit_circle(merged_points)
+                mean_abs, std, roundness = self._circle_quality(merged_points, cx, cy, radius)
                 merged_cluster = {
                     'centroid': (cx, cy),
                     'radius': radius,
                     'points': merged_points,
-                    'scan_index': self.scan_index
+                    'scan_index': self.scan_index,
+                    'quality': {'mean_abs': mean_abs, 'std': std, 'roundness': roundness, 'n': len(merged_points)}
                 }
                 # Replace clusters
                 scan_clusters = [merged_cluster] + scan_clusters[1:-1]
@@ -151,12 +191,18 @@ class LidarDetection(Node):
     def save_cluster(self, indices, points):
         cluster_points = points[indices] #cluster points are the points from the scan at indices
         cx, cy, radius = self.fit_circle(cluster_points) # calulate values
+        mean_abs, std, roundness = self._circle_quality(cluster_points, cx, cy, radius)
         return { # return values
             'centroid': (cx, cy),
             'radius': radius,
             'points': cluster_points,
-            'scan_index': self.scan_index
-        } 
+            'scan_index': self.scan_index,
+            'quality': {
+                'mean_abs': mean_abs,
+                'std': std,
+                'roundness': roundness,
+                'n': len(cluster_points)
+        } }
 
     # ===============================
     # Fit circle
@@ -167,10 +213,10 @@ class LidarDetection(Node):
         """
         x, y = points[:, 0], points[:, 1] # Extract x and y coordinates from points array
         A = np.c_[2*x, 2*y, np.ones(len(points))] # Build design matrix A: [2x, 2y, 1] for each point
-        b = x**2 + y**2   # Right-hand side: x² + y² for each point
-        c, _, _, _ = np.linalg.lstsq(A, b, rcond=None) # Solve A*c = b → c = [a, b, d] in circle eq: x²+y² + ax + by + d = 0
-        cx, cy = c[0], c[1]  # Circle center x = -a/2, y = -b/2 → but we use raw c[0], c[1]
-        r = np.sqrt(c[2] + cx**2 + cy**2)  # Radius = sqrt(d + cx² + cy²) → from completing the square
+        b = x**2 + y**2   # Right-hand side: x� + y� for each point
+        c, _, _, _ = np.linalg.lstsq(A, b, rcond=None) # Solve A*c = b � c = [a, b, d] in circle eq: x�+y� + ax + by + d = 0
+        cx, cy = c[0], c[1]  # Circle center x = -a/2, y = -b/2 � but we use raw c[0], c[1]
+        r = np.sqrt(c[2] + cx**2 + cy**2)  # Radius = sqrt(d + cx� + cy�) � from completing the square
         return cx, cy, r # Return center (cx, cy) and radius
         
     
@@ -292,6 +338,40 @@ class LidarDetection(Node):
                         self.geometries.append([cx, cy, r]) # Add new
                     is_duplicate = True  # Mark as merged
                     break  # Stop checking
+
+            if self._is_stump(tree):
+                # Avoid duplicates with existing stumps
+                is_dup_stump = False
+                for existing in self.stumps:
+                    if np.linalg.norm(np.array(tree['centroid']) - np.array(existing['centroid'])) <= self.min_centroid_dist:
+                        # Merge for better estimate
+                        merged_points = np.vstack((existing['points'], tree['points']))
+                        cx, cy, r = self.fit_circle(merged_points)
+                        mean_abs, std, roundness = self._circle_quality(merged_points, cx, cy, r)
+                        existing.update({
+                            'points': merged_points,
+                            'centroid': (cx, cy),
+                            'radius': r,
+                            'scan_index': tree['scan_index'],
+                            'quality': {'mean_abs': mean_abs, 'std': std, 'roundness': roundness, 'n': len(merged_points)}
+                        })
+                        is_dup_stump = True
+                        break
+                if not is_dup_stump:
+                    self.stumps.append(tree)
+                    # publish one stump as [cx, cy, r]
+                    msg = Float32MultiArray()
+                    cx, cy = tree['centroid']
+                    msg.data = [float(cx), float(cy), float(tree['radius'])]
+                    self.stump_pub.publish(msg)
+                    self.get_logger().info(
+                        f"Published new stump: centroid=({cx:.2f}, {cy:.2f}), r={tree['radius']:.3f}, "
+                        f"n={tree['quality']['n']}, mean_abs={tree['quality']['mean_abs']:.3f}, "
+                        f"std={tree['quality']['std']:.3f}, roundness={tree['quality']['roundness']:.2f}"
+                    )
+
+
+
             # --- If not duplicate, add cluster ---
             if not is_duplicate: # New tree
                 self.trees.append(tree) # Save to global trees
@@ -306,11 +386,50 @@ class LidarDetection(Node):
                     f"scan_index={tree['scan_index']}"
                 )
 
+  
+    def _is_stump(self, cluster) -> bool:
+        """Decide if a single cluster is a stump by size and circularity quality."""
+        r = float(cluster['radius'])
+        q = cluster.get('quality', {})
+        n = int(q.get('n', 0))
+        if n < self.stump_min_points:
+            return False
+        if not (self.stump_radius_min <= r <= self.stump_radius_max):
+            return False
+        mean_abs = float(q.get('mean_abs', 1e9))
+        std = float(q.get('std', 1e9))
+        roundness = float(q.get('roundness', 0.0))
+        if mean_abs > self.stump_max_mean_resid: 
+            return False
+        if std > self.stump_max_std_resid: 
+            return False
+        if roundness < self.stump_min_roundness:
+            return False
+        return True
+
+
+    def _is_stump_by_extent(self, tree):
+        pts = tree['points']
+        if len(pts) < self.stump_min_points:
+            return False
+
+        # Bounding box in XY plane
+        minx, maxx = np.min(pts[:,0]), np.max(pts[:,0])
+        miny, maxy = np.min(pts[:,1]), np.max(pts[:,1])
+
+        width = maxx - minx
+        height = maxy - miny
+        diameter_est = max(width, height)
+
+        # Treat stump if footprint is within expected range
+        return (self.stump_radius_min*2 <= diameter_est <= self.stump_radius_max*2)
+
+
 
     def _publish_geometries_live(self):
         """Send every object (tree + person) as a Float32MultiArray right now."""
         self.geometries = []# Clear old geometry list
-        for obj in self.trees + self.people:# Loop through all trees and people
+        for obj in self.trees + self.people + self.stumps:# Loop through all trees and people
             cx, cy = obj['centroid'] # Get center x, y
             r = obj['radius']# Get radius
             self.geometries.append([cx, cy, r])# Save [cx, cy, r] to list
@@ -367,4 +486,4 @@ def main(args=None):
     rclpy.shutdown()    
 
 if __name__ == '__main__':
-    main()    
+    main()   
