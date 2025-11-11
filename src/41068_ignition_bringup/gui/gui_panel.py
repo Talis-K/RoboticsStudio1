@@ -8,32 +8,24 @@ Mission Console   Figma Layout (Tkinter + ROS2)
 
 import io, math, time, queue, threading, datetime
 from typing import Optional, Tuple, List
-
 import numpy as np
 import tkinter as tk
 from tkinter import ttk
 import os
-from std_msgs.msg import Float32, String, Int32
-
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, QoSDurabilityPolicy
 from rclpy.duration import Duration
 from rclpy.time import Time
-
-
 from PIL import Image as PILImage
 from PIL import ImageTk
-
 from sensor_msgs.msg import Image, LaserScan, CompressedImage, PointCloud2
 from sensor_msgs_py import point_cloud2 as pc2
 from nav_msgs.msg import Odometry, Path
-from std_msgs.msg import Bool, String, Float32MultiArray
+from std_msgs.msg import Bool, String, Float32MultiArray, Float32, Int32
 from geometry_msgs.msg import PoseArray
 from sensor_msgs.msg import BatteryState, Imu, NavSatFix, FluidPressure, Temperature
 from tf2_ros import Buffer, TransformListener, LookupException, ConnectivityException, ExtrapolationException
-from rclpy.qos import QoSDurabilityPolicy
-
 
 
 RAW_IMAGE_TYPE  = 'sensor_msgs/msg/Image'
@@ -55,49 +47,28 @@ def _hypsometric_altitude(p_pa: float, T_k: float, p0_pa: float = SEA_LEVEL_P0_P
     except Exception:
         return float('nan')
 
-# ------------------------------ ROS NODE ------------------------------
+
 class GuiNode(Node):
     def __init__(self, msg_queue: queue.Queue, img_queue: queue.Queue):
         super().__init__('gui_panel_node')
-
-        # Parameters
         self.declare_parameter('scan_topic', '/scan')
         self.declare_parameter('cloud_topic', '')
         self.declare_parameter('image_topic', '')
         self.declare_parameter('odom_topic', '/odom')
         self.declare_parameter('estop_topic', '/e_stop')
         self.declare_parameter('max_altitude', 10.0)
-
-
-        self.declare_parameter('gps_topic', '/gps/fix')
         self.declare_parameter('imu_topic', '/imu')
         self.declare_parameter('flight_mode_topic', '/flight_mode')
-
-        
-
-        # Altitude source selection
         self.declare_parameter('altitude_mode', 'auto')
         self.declare_parameter('altitude_topic', '')
-
         self.declare_parameter('tree_count_topic',   '/mission/tree_count')
         self.declare_parameter('people_count_topic', '/mission/people_count')
-        
-
-     
         self.declare_parameter('stump_count_topic', '/mission/stump_count')
         self.declare_parameter('detections_topic', '/trees/cut')
-
-        #Audio Detetction
-        # Audio / Chainsaw detector topics
-        self.declare_parameter('chainsaw_status_topic',  '/audio/chainsaw/status')   # std_msgs/String
-        self.declare_parameter('chainsaw_metrics_topic', '/audio/chainsaw/metrics')  # std_msgs/Float32MultiArray [class_id, conf, f0_hz, band_power]
-        self.declare_parameter('battery_topic', '/battery')
-        self.declare_parameter('baro_topic', '/baro')
-        self.declare_parameter('temperature_topic', '/temperature')
-
+        self.declare_parameter('chainsaw_status_topic',  '/audio/chainsaw/status')   
+        self.declare_parameter('chainsaw_metrics_topic', '/audio/chainsaw/metrics')  
         self.msg_queue = msg_queue
         self.img_queue = img_queue
-
         qos_best_effort = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
@@ -109,14 +80,9 @@ class GuiNode(Node):
             reliability=ReliabilityPolicy.RELIABLE,
             durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
         )
-
-
-        from std_msgs.msg import Int32
-
         self.tree_count: int   = 0
         self.people_count: int = 0
         self.stump_count: int   = 0
-
         tct = self.get_parameter('tree_count_topic').get_parameter_value().string_value or ''
         pct = self.get_parameter('people_count_topic').get_parameter_value().string_value or ''
         sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
@@ -126,8 +92,6 @@ class GuiNode(Node):
         self.illegal_cuts: int = 0
         lct = self.get_parameter('legal_cut_count_topic').get_parameter_value().string_value or ''
         ilct = self.get_parameter('illegal_cut_count_topic').get_parameter_value().string_value or ''
-
-
         if tct:
             self.create_subscription(Int32, tct, lambda m: setattr(self, 'tree_count', int(m.data)), qos_transient)
         if pct:
@@ -138,8 +102,6 @@ class GuiNode(Node):
             self.create_subscription(Int32, lct, lambda m: setattr(self, 'legal_cuts', int(m.data)), qos_transient)
         if ilct:
             self.create_subscription(Int32, ilct, lambda m: setattr(self, 'illegal_cuts', int(m.data)), qos_transient)
-
-        # Subscriptions
         scan_topic = self.get_parameter('scan_topic').get_parameter_value().string_value
         self.create_subscription(LaserScan, scan_topic, self.on_scan, qos_best_effort)
 
@@ -153,96 +115,56 @@ class GuiNode(Node):
         alt_over = self.get_parameter('altitude_topic').get_parameter_value().string_value
         if alt_over:
             self.create_subscription(Odometry, alt_over, self.on_odom_alt_override, 10)
-
-        # E-STOP pub + sub
         etopic = self.get_parameter('estop_topic').get_parameter_value().string_value
         self.estop_pub = self.create_publisher(Bool, etopic, 10)
         self._estop = False
         self.create_subscription(Bool, etopic, self.on_estop_msg, 10)
-
-        # Camera discovery
         self._img_sub = None
         self._cam_type: Optional[str] = None
         self._requested_image_topic = self.get_parameter('image_topic').get_parameter_value().string_value
         self._discovery_timer = self.create_timer(1.0, self._ensure_camera_subscription)
         self._ensure_camera_subscription(initial=True)
-
-        # Telemetry / pose
         self.altitude_m: Optional[float] = None
         self._altitude_odom: Optional[float] = None
         self._altitude_gps: Optional[float] = None
         self._altitude_baro: Optional[float] = None
-
         self.position_xy: Optional[Tuple[float, float]] = None
         self.yaw_rad: Optional[float] = None
-
-
-
-                # --- IMU accel display options ---
-        self.declare_parameter('imu_gravity_comp', True)     # subtract gravity? (world frame)
-        self.declare_parameter('imu_show_world', True)       # display in world(odom) frame; else IMU body frame
-        self.declare_parameter('g0', 9.80665)                # gravity constant (m/s^2)
-        self.declare_parameter('accel_alpha', 0.3)           # EMA smoothing factor (0..1)
-
+        self.declare_parameter('imu_gravity_comp', True)     
+        self.declare_parameter('imu_show_world', True)       
+        self.declare_parameter('g0', 9.80665)               
+        self.declare_parameter('accel_alpha', 0.3)           
         self._accel_alpha = float(self.get_parameter('accel_alpha').value)
         self._g0 = float(self.get_parameter('g0').value)
         self._imu_gravity_comp = bool(self.get_parameter('imu_gravity_comp').value)
         self._imu_show_world    = bool(self.get_parameter('imu_show_world').value)
-
-        # live accel state
-        self.accel_body = None     # (ax, ay, az) in IMU/body frame (m/s^2)
-        self.accel_world = None    # (Ax, Ay, Az) in world/odom frame (m/s^2)
-        self.accel_mag = None      # |A| of whichever set we choose to show
-
-
-        # Mission/health state
+        self.accel_body = None     
+        self.accel_world = None   
+        self.accel_mag = None    
         self.battery_pct: Optional[float] = None
         self.flight_mode: Optional[str] = None
         self.gps_fix: Optional[NavSatFix] = None
         self.imu_rpy: Optional[Tuple[float, float, float]] = None
         self.wind_ms: Optional[float] = None
         self.wind_heading_deg: Optional[float] = None
-
-        # Audio detection state
-        self.audio_class: Optional[str] = None      # "chainsaw" / "ambient" / "other"
-        self.audio_conf: Optional[float] = None     # 0..1
-        self.audio_f0_hz: Optional[float] = None    # dominant Hz
+        self.audio_class: Optional[str] = None    
+        self.audio_conf: Optional[float] = None     
+        self.audio_f0_hz: Optional[float] = None    
         self.audio_band_power: Optional[float] = None
-
-
-        # Barometer / Temperature
-        self.baro_pressure_pa: Optional[float] = None
-        self.temperature_c: Optional[float] = None
         self._p0_pa: float = SEA_LEVEL_P0_PA
-
         self.breadcrumb: List[Tuple[float, float]] = []
         self.breadcrumb_max = 200
-
         self.waypoints_xy: List[Tuple[float, float]] = []
         self.next_wp_idx: int = 0
-
         self.tree_positions_xy: List[Tuple[float, float]] = []
-
-        # LiDAR prefilter
         self._scan_keep_every = 2
         self._scan_min_valid = 0.03
-
-    
         self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
-
-        # Time sanity
         self._last_scan_stamp_ns: Optional[int] = None
         self._start_time = time.time()
-
-        # Subscribe to extra topics
         self._subscribe_extras()
-
-
-
-
-                # ---- AUDIO (embedded detector) ----
-        self.declare_parameter('mic_audio_topic', '/microphone/audio')  # raw Float32MultiArray audio blocks
+        self.declare_parameter('mic_audio_topic', '/microphone/audio')  
         self.declare_parameter('audio_fs',        16000)
         self.declare_parameter('audio_frame_ms',  500)
         self.declare_parameter('audio_hop_ms',    250)
@@ -250,13 +172,8 @@ class GuiNode(Node):
         self.declare_parameter('chainsaw_high_hz',400.0)
         self.declare_parameter('audio_conf_thresh', 0.55)
         self.declare_parameter('audio_decision_window', 5)
-
-        
-        # Waypoints
         self.declare_parameter('waypoints_path_topic',  '/mission/waypoints_path')
         self.declare_parameter('waypoints_array_topic', '/mission/waypoints')
-
-
         wpt_path = self.get_parameter('waypoints_path_topic').get_parameter_value().string_value or ''
         wpt_arr  = self.get_parameter('waypoints_array_topic').get_parameter_value().string_value or ''
 
@@ -279,8 +196,6 @@ class GuiNode(Node):
         self.get_logger().info(f"[GUI] Command publisher on {cmd_topic}")
         self.mission_state = "IDLE"
         self.mission_progress = 0.0
-
-
         self._aud_topic = self.get_parameter('mic_audio_topic').get_parameter_value().string_value
         self._fs        = int(self.get_parameter('audio_fs').value)
         self._frame_len = int(self.get_parameter('audio_frame_ms').value) * self._fs // 1000
@@ -290,29 +205,14 @@ class GuiNode(Node):
         self._aud_conf_thresh = float(self.get_parameter('audio_conf_thresh').value)
         from collections import deque
         self._aud_votes = deque(maxlen=max(1, int(self.get_parameter('audio_decision_window').value)))
-
         import numpy as _np
         self._aud_buf = _np.zeros(0, dtype=_np.float32)
-
-        # Subscribe to mic audio (Float32MultiArray blocks)
-        from std_msgs.msg import Float32MultiArray
         qos_audio = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT,
                             history=HistoryPolicy.KEEP_LAST, depth=10)
         self.create_subscription(Float32MultiArray, self._aud_topic, self._on_audio_block, qos_audio)
-
-        # Process timer (every hop)
         self._aud_timer = self.create_timer(self._hop_len / max(1, self._fs), self._audio_process)
-
-
  
     def _subscribe_extras(self):
-        bt = self.get_parameter('battery_topic').get_parameter_value().string_value
-        if bt:
-            self.create_subscription(BatteryState, bt, self.on_battery, 10)
-
-        gt = self.get_parameter('gps_topic').get_parameter_value().string_value
-        if gt:
-            self.create_subscription(NavSatFix, gt, self.on_gps, 10)
 
         it = self.get_parameter('imu_topic').get_parameter_value().string_value
         if it:
@@ -321,25 +221,9 @@ class GuiNode(Node):
         fmt = self.get_parameter('flight_mode_topic').get_parameter_value().string_value
         if fmt:
             self.create_subscription(String, fmt, self.on_flight_mode, 10)
-
-        # Baro & Temperature
-        btpc = self.get_parameter('baro_topic').get_parameter_value().string_value
-        if btpc:
-            self.create_subscription(FluidPressure, btpc, self.on_baro, 10)
-
-        tpc = self.get_parameter('temperature_topic').get_parameter_value().string_value
-        if tpc:
-            self.create_subscription(Temperature, tpc, self.on_temperature, 10)
-
-
-
-
-
         dt = self.get_parameter('detections_topic').get_parameter_value().string_value
         if dt:
             self.create_subscription(PoseArray, dt, self.on_tree_detections, 10)
-
-        # Chainsaw detector subscriptions
         st = self.get_parameter('chainsaw_status_topic').get_parameter_value().string_value
         if st:
             self.create_subscription(String, st, self.on_chainsaw_status, 10)
@@ -348,10 +232,10 @@ class GuiNode(Node):
         if mt:
             self.create_subscription(Float32MultiArray, mt, self.on_chainsaw_metrics, 10)
 
-        # initial GUI state = PAUSED until Start is pressed
+       
         self.mission_state = "PAUSED"
 
-        # get mission state from main (latched QoS so late joiners see last)
+        
         self.create_subscription(
             String,
             '/mission/state',
@@ -364,26 +248,9 @@ class GuiNode(Node):
             )
         )
 
-    def on_stumps(self, msg: Float32MultiArray):
-        """
-        Accepts a single stump per message: [x, y, r, h_lb].
-        If you publish batches, loop over chunks of 4 before appending.
-        """
-        try:
-            data = list(msg.data)
-            if len(data) >= 4:
-                x, y, r, h = map(float, data[:4])
-                self.stumps.append((x, y, r, h))
-                # keep memory bounded
-                if len(self.stumps) > 500:
-                    self.stumps = self.stumps[-500:]
-        except Exception:
-            pass
-
     def _on_wp_idx(self, v):   self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
 
-    # ---- E-STOP ----
     def engage_estop(self):
         if not self._estop:
             self._estop = True
@@ -406,7 +273,6 @@ class GuiNode(Node):
     def on_estop_msg(self, msg: Bool):
         self._estop = bool(msg.data)
 
-    # ---- Camera discovery ----
     def _ensure_camera_subscription(self, initial: bool = False):
         if self._img_sub is not None:
             if self._discovery_timer:
@@ -426,7 +292,6 @@ class GuiNode(Node):
 
     @staticmethod
     def _quat_to_R(qx, qy, qz, qw):
-        # Rotation matrix: body -> world
         xx, yy, zz = qx*qx, qy*qy, qz*qz
         xy, xz, yz = qx*qy, qx*qz, qy*qz
         wx, wy, wz = qw*qx, qw*qy, qw*qz
@@ -452,11 +317,9 @@ class GuiNode(Node):
 
     def on_chainsaw_status(self, msg: String):
         """
-        Accepts lines like: 'class=chainsaw conf=1.00 f0=180.0Hz bandPwr=0.91'
-        Robust to extra/missing fields.
+
         """
         s = msg.data.strip()
-        # defaults
         cls, conf, f0, bp = None, None, None, None
         try:
             for tok in s.replace(',', ' ').split():
@@ -472,7 +335,6 @@ class GuiNode(Node):
         except Exception:
             pass
 
-        # apply if present
         if cls is not None: self.audio_class = cls
         if conf is not None: self.audio_conf = conf
         if f0 is not None: self.audio_f0_hz = f0
@@ -508,42 +370,11 @@ class GuiNode(Node):
     def _on_state(self, msg: String):
         st = (msg.data or "").strip().upper()
         self.mission_state = st
-
-        # Keep only *flags* here; never call GUI methods from the node.
         if st == "E-STOP":
             self._estop = True
         elif st in ("RUNNING", "PAUSED", "IDLE", "STOPPED", "RTL", "LAND"):
-            # Clear local E-STOP flag when mission reports a non-estop state.
-            # (If you want a physical latch, remove this line and require Reset.)
             self._estop = False
 
-
-
-    def _on_progress(self, msg):
-        self.mission_progress = msg.data
-        try:
-            self.progress_bar['value'] = int(self.mission_progress * 100)
-        except:
-            pass
-
-    def _update_wp_label(self):
-    # whichever label you use:
-    # e.g., self.tree_count or self.waypoint_count_label — just set the textvariable or configure
-        text = f"{self.wp_idx}/{self.wp_total}" if self.wp_total else "0/0"
-        try:
-            self.waypoint_label_var.set(text)   # if using a StringVar
-        except Exception:
-            self.waypoint_label.configure(text=text)
-
-    def _update_waypoint_label(self):
-        text = f"{self.wp_idx}/{self.wp_total}"
-        try:
-            self.waypoint_label_var.set(text)  # if using StringVar
-        except:
-            try:
-                self.waypoint_label.configure(text=text)  # if direct widget configure
-            except:
-                pass
 
     def _resolve_camera_topic(self, requested: str):
         if requested:
@@ -560,14 +391,9 @@ class GuiNode(Node):
                 return n, 'compressed'
         return None, None
 
-    def on_estop_pressed(self):
-        self.estop_pub.publish(Bool(data=True))
-
-
     def _on_audio_block(self, msg):
         """Append incoming audio samples (Float32MultiArray) to the buffer."""
         try:
-            import numpy as np
             arr = np.asarray(msg.data, dtype=np.float32).ravel()
             if arr.size:
                 self._aud_buf = np.concatenate([self._aud_buf, arr])
@@ -577,22 +403,16 @@ class GuiNode(Node):
     def _audio_process(self):
         """Run a simple FFT-based detector over frames and update GUI fields."""
         try:
-            import numpy as np
             if self._aud_buf.size < self._frame_len:
                 return
 
-            # Take one frame, keep overlap (hop)
             x = self._aud_buf[:self._frame_len]
             self._aud_buf = self._aud_buf[self._hop_len:]
-
-            # Window + FFT
             win = np.hanning(len(x))
             xw  = x * win
             spec = np.fft.rfft(xw)
             mag  = np.abs(spec) + 1e-12
             freqs = np.fft.rfftfreq(len(x), d=1.0 / self._fs)
-
-            # Focus chainsaw band
             mask = (freqs >= self._band_lo) & (freqs <= self._band_hi)
             if not np.any(mask):
                 return
@@ -600,13 +420,9 @@ class GuiNode(Node):
             band_freqs = freqs[mask]
             peak_idx   = int(np.argmax(band_mag))
             f0         = float(band_freqs[peak_idx])
-
-            # Relative band power
             band_power  = float(np.sum(band_mag**2))
             total_power = float(np.sum(mag**2)) + 1e-12
             rel_band    = band_power / total_power
-
-            # Harmonicity (quick & dirty)
             max_hz = 2000.0
             kmax   = int(max_hz // max(f0, 1.0))
             hvals  = []
@@ -619,42 +435,28 @@ class GuiNode(Node):
                 if np.any(m):
                     hvals.append(np.max(mag[m]))
             harm = float(np.mean(hvals) / (np.mean(mag) + 1e-12)) if hvals else 0.0
-
-            # Confidence & label
             conf  = float(0.6 * np.clip(rel_band * 2.0, 0.0, 1.0) + 0.4 * np.clip(harm, 0.0, 1.0))
             label = 'chainsaw' if conf >= self._aud_conf_thresh else 'ambient'
-
-            # Smooth over a short window
             self._aud_votes.append((label, conf, f0, rel_band))
             labels = [d[0] for d in self._aud_votes]
             maj    = max(set(labels), key=labels.count)
             mean_c = float(np.mean([d[1] for d in self._aud_votes]))
             mean_f = float(np.mean([d[2] for d in self._aud_votes]))
             mean_p = float(np.mean([d[3] for d in self._aud_votes]))
-
-            # Update the same fields your poll_telemetry() already reads
             self.audio_class       = maj
             self.audio_conf        = mean_c
             self.audio_f0_hz       = mean_f
             self.audio_band_power  = mean_p
 
         except Exception:
-            # Keep GUI robust
             pass
 
 
-    # ---- Callbacks ----
     def on_scan(self, msg: LaserScan):
-        # if self._estop:
-        #     return
-
-        # Drop out-of-order timestamps
         stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
         if self._last_scan_stamp_ns is not None and stamp_ns < self._last_scan_stamp_ns:
             return
         self._last_scan_stamp_ns = stamp_ns
-
-        # Build points
         pts = []
         ang = msg.angle_min
         k = max(1, int(self._scan_keep_every))
@@ -666,9 +468,8 @@ class GuiNode(Node):
                 pts.append((r * math.cos(ang), r * math.sin(ang)))
             ang += msg.angle_increment
 
-        # Transform to od# Transform to a world frame
-        src_frame = (msg.header.frame_id or 'laser').lstrip('/')  # strip leading '/'
-        target_candidates = ['odom', 'map', 'base_link']          # try these in order
+        src_frame = (msg.header.frame_id or 'laser').lstrip('/')  
+        target_candidates = ['odom', 'map', 'base_link']          
         frame_used = src_frame
         world = False
 
@@ -688,7 +489,7 @@ class GuiNode(Node):
         tf_ok = False
         for tgt in target_candidates:
             try:
-                # Latest available TF (time=0) and a more generous timeout
+                
                 tfm = self.tf_buffer.lookup_transform(
                     tgt, src_frame, Time(), timeout=Duration(seconds=0.5)
                 )
@@ -699,8 +500,6 @@ class GuiNode(Node):
                 break
             except (LookupException, ConnectivityException, ExtrapolationException):
                 continue
-
-        # If no TF worked, we’ll keep points in sensor frame and let the drawer auto-fit
 
         try:
             self.msg_queue.put({
@@ -774,30 +573,10 @@ class GuiNode(Node):
         except Exception:
             pass
 
-    # ---- extra callbacks ----
-    def on_battery(self, msg: BatteryState):
-        if msg.percentage is not None and math.isfinite(msg.percentage):
-            self.battery_pct = max(0.0, min(1.0, float(msg.percentage)))
-        else:
-            self.battery_pct = None
-
     def on_flight_mode(self, msg: String):
         self.flight_mode = msg.data.strip()
 
-    def on_gps(self, msg: NavSatFix):
-        self.gps_fix = msg
-        if math.isfinite(getattr(msg, 'altitude', float('nan'))):
-            self._altitude_gps = float(msg.altitude)
-
-    def on_start_clicked(self):
-    
-     self.mission_cmd_pub.publish(String(data='start'))
-
-    def on_stop_clicked(self):
-     self.mission_cmd_pub.publish(String(data='stop'))
-
     def on_imu(self, msg: Imu):
-        # --- orientation to RPY (unchanged) ---
         q = msg.orientation
         sinr_cosp = 2 * (q.w * q.x + q.y * q.z)
         cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y)
@@ -810,28 +589,17 @@ class GuiNode(Node):
         cosy_cosp = 1 - 2 * (q.y * q.y + q.z * q.z)
         yaw = math.atan2(siny_cosp, cosy_cosp)
         self.imu_rpy = (roll, pitch, yaw)
-
-        # --- raw linear acceleration in IMU/body frame ---
         ax = float(msg.linear_acceleration.x)
         ay = float(msg.linear_acceleration.y)
         az = float(msg.linear_acceleration.z)
         a_body = (ax, ay, az)
-
-        # smooth body accel (EMA)
         self.accel_body = self._ema(self.accel_body, a_body, self._accel_alpha)
-
-        # --- rotate to world and (optionally) remove gravity ---
-        R_bw = self._quat_to_R(q.x, q.y, q.z, q.w)       # body -> world
+        R_bw = self._quat_to_R(q.x, q.y, q.z, q.w)     
         a_world = self._mat_vec3(R_bw, self.accel_body)
 
         if self._imu_gravity_comp:
-            # subtract gravity in world Z (down = +g depending on convention; here we subtract +g on +Z)
             a_world = (a_world[0], a_world[1], a_world[2] - self._g0)
-
-        # smooth world accel too (keeps both representations pleasant)
         self.accel_world = self._ema(self.accel_world, a_world, self._accel_alpha)
-
-        # pick what to present in GUI
         Ax, Ay, Az = (self.accel_world if self._imu_show_world else self.accel_body)
         self.accel_mag = math.sqrt(Ax*Ax + Ay*Ay + Az*Az)
 
@@ -881,34 +649,21 @@ class AppFigma:
     def __init__(self, node: GuiNode, q_scan: queue.Queue, q_img: queue.Queue):
         self.node, self.q_scan, self.q_img = node, q_scan, q_img
         self.icons = IconManager(ICONS_DIR)  
-
-        # --- Window ---
         self.root = tk.Tk()
         self.root.title("Mission Console")
         self.root.geometry("1920x1080")
-        #self.root.state("zoomed")
         self.root.resizable(True, True)
-
-
-        # --- Theme ---
         self._apply_theme()
-
-        # === TOP BAR ===========================================================
         topbar = ttk.Frame(self.root, padding=(16, 10, 16, 8), style="Topbar.TFrame")
         topbar.pack(side=tk.TOP, fill=tk.X)
-
-        # left
         left_wrap = ttk.Frame(topbar, style="Topbar.TFrame"); left_wrap.pack(side=tk.LEFT)
         self.lbl_sys = ttk.Label(left_wrap, text="System Active", style="TopTitle.TLabel")
         self.lbl_sys.pack(side=tk.LEFT, padx=(0, 8))
-        # profile badge with tiny robot
         robot_ic = self.icons.get("robot", 16)
         self.lbl_profile = ttk.Label(left_wrap, text="Drone Control", style="BadgeGrey.TLabel",
                                      image=robot_ic, compound="left")
         self.lbl_profile.image = robot_ic
         self.lbl_profile.pack(side=tk.LEFT)
-
-        # right
         right = ttk.Frame(topbar, style="Topbar.TFrame"); right.pack(side=tk.RIGHT)
         wifi_ic = self.icons.get("wifi", 16) or None
         rc_ic   = self.icons.get("rc", 16) or None
@@ -925,60 +680,47 @@ class AppFigma:
                                  image=clock_ic, compound="left")
         self.lbl_utc.image = clock_ic
         self.lbl_utc.pack(side=tk.LEFT, padx=(10,0))
-
-        # === METRICS ROW (6) ===================================================
         metrics = ttk.Frame(self.root, padding=(16, 0, 16, 8), style="Bg.TFrame")
         metrics.pack(side=tk.TOP, fill=tk.X)
 
         self.card_tree    = self._metric_card(metrics, "Tree Count",  "0", "Detected Trees", 0, icon=("tree",16))
         self.tree_people_var = tk.StringVar(value="People: 0")
-        # Inline (to the right of the big number)
         self.tree_cuts_var = tk.StringVar(value="Legal: 0 | Illegal: 0")
         self._add_inline_right_of_value(self.card_tree, self.tree_cuts_var)
-
-
         self._add_footer_counter(self.card_tree, self.tree_people_var)
         self.card_audio   = self._metric_card(metrics, "Audio (Hz)",  "-- Hz", "—",           1, icon=("mic",16))
         self.card_speed   = self._metric_card(metrics, "Speed",      "-- m/s",  "-- km/h",           2, icon=("speed",16))
         self.card_home    = self._metric_card(metrics, "Home Dist",  "-- m",    "Within bounds",     3, icon=("home",16))
         self.card_time    = self._metric_card(metrics, "Flight Time","00:00",   "Elapsed",           4, icon=("time",16))
         self.card_waypts  = self._metric_card(metrics, "Waypoints",   "0 / 0", "Completed", 5, icon=("map-pin",16))
-
-
-
         self._hover_swap(self.lbl_tel, "TopMeta.TLabel", "TopMetaHover.TLabel")
         self._hover_swap(self.lbl_rc,  "TopMeta.TLabel", "TopMetaHover.TLabel")
         self._hover_swap(self.lbl_utc, "TopMeta.TLabel", "TopMetaHover.TLabel")
         self._hover_swap(self.lbl_sys, "TopTitle.TLabel", "TopTitleHover.TLabel")
         self._hover_swap(self.lbl_profile, "BadgeGrey.TLabel", "TopMetaHover.TLabel")
 
-        # === BODY GRID  ===================================================
         body = ttk.Frame(self.root, padding=(16, 0, 16, 16), style="Bg.TFrame")
         body.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         body.columnconfigure(0, weight=3); body.columnconfigure(1, weight=2)
         body.rowconfigure(0, weight=1);    body.rowconfigure(1, weight=3)
 
-        # (A) Camera (top-left)
-        # --- Camera Feed Banner Card ---
         cam = ttk.Frame(body, style="Card.TFrame")
         cam.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
         body.grid_columnconfigure(0, weight=1)
         body.grid_rowconfigure(0, weight=1)
 
-        # Header banner
+
         cam_hdr = ttk.Frame(cam, style="BannerBlue.TFrame")
         cam_hdr.pack(fill="x")
 
-        # Left: title + icon
         ttk.Label(cam_hdr, text="Camera Feed", style="BannerBlue.TLabel",
                 image=self.icons.get("camera", 16), compound="left").pack(side="left", padx=10, pady=8)
 
-        # Right: rounded red “LIVE” chip
         live_chip = tk.Label(
             cam_hdr,
             text="LIVE",
-            bg="#FDECEC",     # soft red background
-            fg="#E11900",     # bold red text
+            bg="#FDECEC",     
+            fg="#E11900",     
             font=("SF Pro Text", 9, "bold"),
             padx=10, pady=3,
             bd=0
@@ -987,10 +729,6 @@ class AppFigma:
         live_chip.configure(relief="flat")
         live_chip.bind("<Enter>", lambda e: live_chip.config(bg="#FAD7D7"))
         live_chip.bind("<Leave>", lambda e: live_chip.config(bg="#FDECEC"))
-
-
-
-
         
         cam_hdr = ttk.Frame(cam, style="Card.TFrame"); cam_hdr.pack(fill="x")
         rec_ic = self.icons.get("record", 14)
@@ -1004,24 +742,20 @@ class AppFigma:
                                    style="CardMutedCenter.TLabel", anchor="center")
         self.cam_label.pack(fill="both", expand=True, pady=8)
 
-        # (B) Control panel (top-right)
         ctl = ttk.Frame(body, style="Card.TFrame")
         ctl.grid(row=0, column=1, sticky="nsew", padx=8, pady=8)
         body.grid_columnconfigure(1, weight=2)
 
-        # Banner header
+
         ctl_hdr = ttk.Frame(ctl, style="BannerTeal.TFrame")
         ctl_hdr.pack(fill="x")
 
-        # Left: title + compass icon
         ttk.Label(ctl_hdr, text="Flight Controls", style="BannerTeal.TLabel",
                 image=self.icons.get("compass", 16), compound="left").pack(side="left", padx=10, pady=8)
 
-        # Right: flight mode chip (dynamic)
-        #self._chip(ctl_hdr, "AUTO", bg="#E9FFF6", fg="#156F4B", hover_bg="#D9FFEF")
+
         self._mode_chip = self._chip(ctl_hdr, "Running", bg="#33992F", fg="#A4E7AF", hover_bg="#9DE68E")
 
-        # Body (your existing content)
         ctl_body = ttk.Frame(ctl, style="Card.TFrame", padding=(6, 8))
         ctl_body.pack(fill="both", expand=True)
         fm_row = ttk.Frame(ctl, style="Card.TFrame"); fm_row.pack(fill="x", pady=(2,8))
@@ -1038,12 +772,9 @@ class AppFigma:
         em = ttk.Frame(ctl, style="Card.TFrame"); em.pack(fill="x", pady=(0,6))
         em.columnconfigure(0, weight=1, uniform="em")
         em.columnconfigure(1, weight=1, uniform="em")
-
-        # LEFT column (E-STOP + centered banner)
         left = ttk.Frame(em, style="Card.TFrame")
         left.grid(row=0, column=0, sticky="nsew", padx=(0,8))
         left.columnconfigure(0, weight=1)
-
         self.estop_btn = tk.Button(
             left, text="  E-STOP", font=("SF Pro Text", 14, "bold"),
             bg="#E11900", fg="white", bd=0, height=2, cursor="hand2",
@@ -1055,7 +786,6 @@ class AppFigma:
             self.estop_btn.config(image=estop_ic, compound="left")
             self.estop_btn.image = estop_ic
         self.estop_btn.grid(row=0, column=0, sticky="ew")
-
         self.estop_banner = tk.Label(
             left, text="EMERGENCY STOP ACTIVE",
             font=("SF Pro Text", 14, "bold"),
@@ -1063,11 +793,8 @@ class AppFigma:
         )
         self.estop_banner.grid(row=1, column=0, sticky="ew", pady=(8,0))
         self.estop_banner.grid_remove()
-
-        # RIGHT column (Reset button)
         right = ttk.Frame(em, style="Card.TFrame")
         right.grid(row=0, column=1, sticky="nsew", padx=(8,0))
-
         self.reset_btn = tk.Button(
             right, text="  Reset", font=("SF Pro Text", 12, "bold"),
             bg="#EEF0F5", fg="#111", bd=0, height=2, cursor="hand2",
@@ -1079,113 +806,60 @@ class AppFigma:
             self.reset_btn.config(image=reset_ic, compound="left")
             self.reset_btn.image = reset_ic
         self.reset_btn.pack(fill="x")
-
-
-
-
-
-
-        # Mission Controls
         ttk.Label(ctl, text="Mission Controls", style="Section.TLabel",
                   image=self.icons.get("gps",16), compound="left").pack(anchor="w", pady=(8,6))
         mc = ttk.Frame(ctl, style="Card.TFrame"); mc.pack(fill="x")
-        # Make a 2×2 grid inside `mc`
         for c in (0, 1):
             mc.columnconfigure(c, weight=1, uniform="mc")
         for r in (0, 1):
             mc.rowconfigure(r, weight=1)
-
         btn_start  = self._pill(mc, " Start",  "#23A559", self._send_cmd, "start",  icon=("play",18))
         btn_stop   = self._pill(mc, " Stop",   "#EF5944", self._send_cmd, "stop",   icon=("stop",18))
         btn_pause  = self._pill(mc, " Pause",  "#F5A623", self._send_cmd, "pause",  icon=("pause",18))
         btn_resume = self._pill(mc, " Resume", "#4A7BD0", self._send_cmd, "resume", icon=("resume",18))
-        for r in (0, 1, 2): mc.rowconfigure(r, weight=1)  # extend grid
-        # btn_rtl  = self._pill(mc, " RTL",  "#A855F7", self._send_cmd, "rtl",  icon=("rtl",18))
-        # btn_land = self._pill(mc, " Land", "#22D3EE", self._send_cmd, "land", icon=("land",18))
-
+        for r in (0, 1, 2): mc.rowconfigure(r, weight=1)  
         btn_start .grid(row=0, column=0, sticky="nsew", padx=(0,6), pady=(0,6))
         btn_stop  .grid(row=0, column=1, sticky="nsew", padx=(6,0), pady=(0,6))
         btn_pause .grid(row=1, column=0, sticky="nsew", padx=(0,6), pady=(6,0))
         btn_resume.grid(row=1, column=1, sticky="nsew", padx=(6,0), pady=(6,0))
-        # btn_rtl .grid(row=2, column=0, sticky="nsew", padx=(0,6), pady=(6,0))
-        # btn_land.grid(row=2, column=1, sticky="nsew", padx=(6,0), pady=(6,0))
-
-
-
         self.lbl_status = ttk.Label(ctl, text="Status: Started", style="BadgeGrey.TLabel")
         self.lbl_status.pack(anchor="w", pady=(8,0))
-
-        # (C) LiDAR map (bottom-left)
-        # --- LiDAR Map Banner Card ---
         lidar = ttk.Frame(body, style="Card.TFrame")
         lidar.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
-        body.grid_rowconfigure(1, weight=3)   # you already had row weights; OK to repeat
+        body.grid_rowconfigure(1, weight=3)   
         body.grid_columnconfigure(0, weight=3)
-
         lid_hdr = ttk.Frame(lidar, style="BannerCyan.TFrame")
         lid_hdr.pack(fill="x")
-
-        # Left: title + icon
         ttk.Label(lid_hdr, text="LiDAR Map", style="BannerCyan.TLabel",
                 image=self.icons.get("lidar",16), compound="left").pack(side="left", padx=10, pady=8)
-
-        # Right: cyan “360° Scan Active” chip
         self._chip(lid_hdr, "360° Scan Active", bg="#E6FAFF", fg="#116B7A", hover_bg="#D2F4FF")
-
-        # Body area (canvas stays the same, just parented to the banner-card body)
         lid_body = ttk.Frame(lidar, style="Card.TFrame", padding=0)
         lid_body.pack(fill="both", expand=True)
 
         self.canvas = tk.Canvas(lid_body, height=300, bg="#FAFBFD", highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, pady=(6, 0))
-
-
-        # (D) Telemetry side panel (bottom-right)
-    # --- Odometry Banner Card ---
         odo = ttk.Frame(body, style="Card.TFrame")
         odo.grid(row=1, column=1, sticky="nsew", padx=8, pady=8)
         body.grid_columnconfigure(1, weight=2)
 
         odo_hdr = ttk.Frame(odo, style="BannerPurple.TFrame")
         odo_hdr.pack(fill="x")
-
-        # Left: title + icon
         ttk.Label(odo_hdr, text="Odometry Data", style="BannerPurple.TLabel",
                 image=self.icons.get("robot",16), compound="left").pack(side="left", padx=10, pady=8)
-
-        # Right: purple “LIVE” chip
         self._chip(odo_hdr, "LIVE", bg="#F2ECFF", fg="#5A3EAA", hover_bg="#E8DEFF")
-
-        # Body where you put the odometry labels/IMU/altitude/etc.
         telem = ttk.Frame(odo, style="Card.TFrame")
         telem.pack(fill="both", expand=True)
-
         odo_wrap = ttk.Frame(telem, style="Card.TFrame"); odo_wrap.pack(fill="x", pady=(0,2))
         ttk.Label(odo_wrap, text=" Odometry Data", style="Section.TLabel",
                   image=self.icons.get("compass",16), compound="left").pack(anchor="w")
         self.lbl_odo = ttk.Label(telem, text="", style="Mono.TLabel", justify="left")
         self.lbl_odo.pack(anchor="nw", fill="x")
         ttk.Separator(telem, orient="horizontal").pack(fill="x", pady=6)
-
-            # odo = ttk.Frame(body, style="Card.TFrame")
-            # odo.grid(row=1, column=0, sticky="nsew", padx=8, pady=8)
-
-            # odo_hdr = ttk.Frame(odo, style="BannerPurple.TFrame")
-            # odo_hdr.pack(fill="x")
-            # ttk.Label(odo_hdr, text="Odometry Data", style="BannerPurple.TLabel",
-            #         image=self.icons.get("robot",16), compound="left").pack(side="left", padx=10, pady=8)
-            # ttk.Label(odo_hdr, text="LIVE", style="BannerPurple.TLabel").pack(side="right", padx=10, pady=8)
-
-            # odo_body = ttk.Frame(odo, style="Card.TFrame", padding=10)
-            # odo_body.pack(fill="both", expand=True)
-
-
         imu_wrap = ttk.Frame(telem, style="Card.TFrame"); imu_wrap.pack(fill="x", pady=(2,2))
         ttk.Label(imu_wrap, text=" IMU Data", style="Section.TLabel",
                   image=self.icons.get("compass",16), compound="left").pack(anchor="w")
         self.lbl_imu = ttk.Label(imu_wrap, text="Roll:Pitch:Yaw:Accel: 9.81 m/s", style="Muted.TLabel")
         self.lbl_imu.pack(anchor="w", pady=(3,0))
-
         alt_wrap = ttk.Frame(telem, style="Card.TFrame"); alt_wrap.pack(fill="x", pady=(8,2))
         ttk.Label(alt_wrap, text=" Altitude", style="Section.TLabel",
                   image=self.icons.get("altitude",16) or self.icons.get("time",16), compound="left").pack(anchor="w")
@@ -1200,31 +874,6 @@ class AppFigma:
         self.alt_pb.pack(fill="x", pady=(6,0))
         self.lbl_alt_text = ttk.Label(alt_wrap, text="Current:  m  (Ground: 0 m  Max: {} m)".format(self.alt_pb["maximum"]), style="Muted.TLabel")
         self.lbl_alt_text.pack(anchor="w", pady=(4,0))
-
-        # bat_wrap = ttk.Frame(telem, style="Card.TFrame"); bat_wrap.pack(fill="x", pady=(8,2))
-        # ttk.Label(bat_wrap, text=" Battery", style="Section.TLabel",
-        #           image=self.icons.get("battery",16), compound="left").pack(anchor="w")
-        # self.bat_pb = ttk.Progressbar(bat_wrap, maximum=100.0); self.bat_pb.pack(fill="x", pady=(6,0))
-        # self.lbl_bat_text = ttk.Label(bat_wrap, text="Charge:  %   40.0V     ~  min", style="Muted.TLabel")
-        # self.lbl_bat_text.pack(anchor="w", pady=(4,0))
-
-        # p_wrap = ttk.Frame(telem, style="Card.TFrame"); p_wrap.pack(fill="x", pady=(8,2))
-        # ttk.Label(p_wrap, text=" Power", style="Section.TLabel",
-        #           image=self.icons.get("power",16) or self.icons.get("bolt",16), compound="left").pack(anchor="w")
-        # self.lbl_power = ttk.Label(p_wrap, text="Current:   A    Power:   W    Consumed:   mAh", style="Muted.TLabel")
-        # self.lbl_power.pack(anchor="w", pady=(4,0))
-
-        # baro_wrap = ttk.Frame(telem, style="Card.TFrame"); baro_wrap.pack(fill="x", pady=(8,2))
-        # ttk.Label(baro_wrap, text=" Barometer", style="Section.TLabel",
-        #           image=self.icons.get("barometer",16) or self.icons.get("thermo",16), compound="left").pack(anchor="w")
-        # self.lbl_baro = ttk.Label(baro_wrap, text="Pressure:   hPa    Temperature:   �C    Humidity:  %", style="Muted.TLabel")
-        # self.lbl_baro.pack(anchor="w", pady=(4,0))
-
-        # stat_wrap = ttk.Frame(telem, style="Card.TFrame"); stat_wrap.pack(fill="x", pady=(10, 0))
-        # self.stat_card_trees = self._mini_stat(stat_wrap, "Trees Cut", "0", icon=("tree",18))
-        # self.stat_card_wp    = self._mini_stat(stat_wrap, "Waypoints", "0/0", icon=("waypoint",18))
-
-        # internals/pollers/bindings (unchanged)
         self._last_photo = None; self._cam_max_w = 1000; self._cam_max_h = 520
         self._last_draw_ts = 0.0; self._max_fps = 20.0
         self._static_bounds = None; self._fixed_view = True; self._fixed_range_m = 8.0
@@ -1237,7 +886,6 @@ class AppFigma:
         self.root.bind("<space>", lambda e: self.on_estop_press())
         self.root.bind("<r>",      lambda e: self.on_estop_reset())
 
-    # ---------- theme / helpers (same as your current version, with icon support) ----------
     def _apply_theme(self):
         style = ttk.Style()
         try: style.theme_use('clam')
@@ -1267,20 +915,18 @@ class AppFigma:
         style.map("PillOutline.TButton", background=[("active","#F3F4F7")])
         style.configure(
             "AltBar.Horizontal.TProgressbar",
-            troughcolor="#EEF1F6",   # track colour
-            background="#34C759",    # fill colour (green)
+            troughcolor="#EEF1F6",   
+            background="#34C759",    
             bordercolor="#EEF1F6",
             lightcolor="#34C759",
             darkcolor="#34C759"
         )
         style.configure("AltBarWarn.Horizontal.TProgressbar", troughcolor="#FDECEC", background="#E11900")
         style.configure("AltBarMid.Horizontal.TProgressbar",  troughcolor="#FFF6E6", background="#F5A623")
-
         style.configure('TopMeta.TLabel',
             background="#FFFFFF", foreground="#6B778C", font=("SF Pro Text", 10), padding=(10,6))
         style.configure('TopMetaHover.TLabel',
             background="#F3F4F7", foreground="#0B1625", font=("SF Pro Text", 10), padding=(10,6))
-       
         style.configure('TopTitleHover.TLabel',
             background="#FFFFFF", foreground="#0B1625", font=("SF Pro Display", 16, "bold"))
         style.configure("BannerBlue.TFrame",   background="#E9F2FF")
@@ -1288,15 +934,11 @@ class AppFigma:
         style.configure("BannerPurple.TFrame", background="#F2ECFF")
         style.configure("BannerPurple.TLabel", background="#F2ECFF", foreground="#5A3EAA", font=("SF Pro Text", 10, "bold"))
         style.configure("BannerRed.TFrame",   background="#E9F2FF")
-        style.configure("BannerRed.TLabel",   background="#EB7B67", foreground="#FF1E00", font=("SF Pro Text", 10, "bold"))
-
-          
+        style.configure("BannerRed.TLabel",   background="#EB7B67", foreground="#FF1E00", font=("SF Pro Text", 10, "bold")) 
         style.configure("BannerBlue.TFrame",   background="#E9F2FF")
         style.configure("BannerBlue.TLabel",   background="#E9F2FF", foreground="#1B4B91", font=("SF Pro Text", 10, "bold"))
-
         style.configure("BannerCyan.TFrame",   background="#E6FAFF")
         style.configure("BannerCyan.TLabel",   background="#E6FAFF", foreground="#116B7A", font=("SF Pro Text", 10, "bold"))
-
         style.configure("BannerPurple.TFrame", background="#F2ECFF")
         style.configure("BannerPurple.TLabel", background="#F2ECFF", foreground="#5A3EAA", font=("SF Pro Text", 10, "bold"))
         style.configure("BannerTeal.TFrame",  background="#E9FFF6")
@@ -1306,8 +948,6 @@ class AppFigma:
     def _hover_swap(self, widget, normal: str, hover: str, cursor="hand2"):
         widget.bind("<Enter>", lambda e: (widget.configure(style=hover), widget.configure(cursor=cursor)))
         widget.bind("<Leave>", lambda e: (widget.configure(style=normal), widget.configure(cursor="")))
-
-
 
     def _card(self, parent, title, *, row, col, colspan=1, rowspan=1):
         wrap = ttk.Labelframe(parent, text=title, padding=12, style="Card.TLabelframe")
@@ -1328,8 +968,6 @@ class AppFigma:
                 glyph = ttk.Label(card, image=ic, style="Card.TFrame")
                 glyph.image = ic
                 glyph.place(relx=1.0, x=-10, y=6, anchor="ne")
-
-        # create once; store refs on the frame
         card.val_lbl = ttk.Label(card, text=value, style="MetricValue.TLabel")
         card.sub_lbl = ttk.Label(card, text=sub,   style="MetricSub.TLabel")
         card.val_lbl.pack(anchor="w", pady=(2,0))
@@ -1337,17 +975,8 @@ class AppFigma:
         return card
     def _add_footer_counter(self, card, var: tk.StringVar):
         lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
-        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)  # was y=-8; either is fine now
+        lbl.place(relx=1.0, rely=1.0, anchor="se", x=-10, y=-8)  
         card.footer_people_lbl = lbl
-
-
-    def _add_footer_left(self, card, var: tk.StringVar):
-        """Small label in the bottom-left corner of a metric card."""
-        lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
-        lbl.place(relx=0.0, rely=1.0, anchor="sw", x=10, y=-8)  # bottom-left
-        card.footer_left_lbl = lbl
-
-
 
     def _pill(self, parent, text, color, cb, payload, outline=False, icon=None):
         if outline:
@@ -1357,7 +986,6 @@ class AppFigma:
                 name, size = icon
                 ic = self.icons.get(name, size)
                 if ic:
-                    # ttk.Button supports 'image' too
                     btn.config(image=ic, compound="left")
                     btn.image = ic
             return btn
@@ -1373,12 +1001,6 @@ class AppFigma:
                 b.image = ic
         return b
     
-    def _safe_has(self, name: str) -> bool:
-        return hasattr(self, name) and getattr(self, name) is not None
-
-  
-
-
     def _mini_stat(self, parent, title, value, icon=None):
         tile = ttk.Frame(parent, style="Card.TFrame")
         tile.pack(side=tk.LEFT, fill="x", expand=True, padx=4)
@@ -1391,39 +1013,25 @@ class AppFigma:
         if name_img: lbl.image = name_img
         return lbl
 
-    # ---- rest of class (poll_img, poll_scan, poll_telemetry, clustering/drawing) stays the same ----
-
-
-    # ------------------------------ Actions (unchanged) ------------------------------
     def on_estop_press(self):
         self.node.engage_estop()
         self._set_estop_ui(True)
-
-    
 
     def on_estop_reset(self):
         self.node.reset_estop()
         self._set_estop_ui(False)
 
-  
-
     def _send_cmd(self, cmd: str):
         try:
             self.node.mission_cmd_pub.publish(String(data=cmd))
-            # optimistic local preview
             if   cmd == "start":  self.node.mission_state = "RUNNING"
             elif cmd == "pause":  self.node.mission_state = "PAUSED"
             elif cmd == "resume": self.node.mission_state = "RUNNING"
             elif cmd == "stop":   self.node.mission_state = "STOPPED"
-            elif cmd == "rtl":    self.node.mission_state = "RTL"
-            elif cmd == "land":   self.node.mission_state = "LAND"
             print(f"[GUI] Sent mission cmd: {cmd}")
         except Exception as e:
             print(f"[GUI] Failed to publish mission cmd: {e}")
 
-
-
-    # ------------------------------ Pollers (kept, with extra label updates) ----
     def poll_img(self):
         img = None
         try:
@@ -1466,7 +1074,7 @@ class AppFigma:
                 frame=item.get('frame',''),
                 stamp=item.get('stamp',''),
                 n=item.get('n_total',''),
-                world=item.get('world', True)  # NEW
+                world=item.get('world', True) 
             )
 
         self.root.after(40, self.poll_scan)
@@ -1474,52 +1082,38 @@ class AppFigma:
     def _add_inline_right_of_value(self, card, var: tk.StringVar):
         """Attach a small label just to the right of the big value number."""
         lbl = ttk.Label(card, textvariable=var, style="MutedSmall.TLabel")
-        # Place relative to the big value label so it hugs its right edge
         lbl.place(in_=card.val_lbl, relx=1.0, rely=0.55, x=12, anchor="w")
         card.inline_right_lbl = lbl
 
 
     def poll_telemetry(self):
         try:
-            # Top bar
             bp = self.node.battery_pct
             self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: 100%")
             self.lbl_rc.config(text="RC: Strong")
             self.lbl_utc.config(text=datetime.datetime.utcnow().strftime("UTC %H:%M:%S"))
-
-            # --- Metric cards you actually have: tree, audio, speed, home, time, waypts ---
-
-            # Tree count (from PoseArray of detections)
-            # --- Trees (prefer count topic, else fallback to positions) ---
             trees_via_topic = getattr(self.node, 'tree_count', None)
             if isinstance(trees_via_topic, (int, float)) and trees_via_topic >= 0:
                 self._metric_set(self.card_tree, str(int(trees_via_topic)), "Detected Trees")
             else:
                 trees = len(self.node.tree_positions_xy) if getattr(self.node, 'tree_positions_xy', None) else 0
                 self._metric_set(self.card_tree, str(trees), "Detected Trees")
-
-            # --- People (prefer count topic, else fallback to any stored positions list if you have one) ---
             people = getattr(self.node, 'people_count', None)
             if people is None:
-                people = len(getattr(self.node, 'people_positions_xy', []))  # safe if you don't have it
+                people = len(getattr(self.node, 'people_positions_xy', []))  
             people = int(people)
 
-            # --- Stumps (prefer count topic, else fallback to local stumps list) ---
-            stumps_via_topic = getattr(self.node, 'stump_count', None)  # create this topic later if you like
+            stumps_via_topic = getattr(self.node, 'stump_count', None)  
             if isinstance(stumps_via_topic, (int, float)) and stumps_via_topic >= 0:
                 stumps = int(stumps_via_topic)
             else:
                 stumps = len(getattr(self.node, 'stumps', []))
-
-            # Optional: average stump height label if you’re publishing [x,y,r,h] and keeping self.node.stumps
             avg_h = None
             try:
                 if stumps and getattr(self.node, 'stumps', None):
                     avg_h = sum(h for (_, _, _, h) in self.node.stumps) / len(self.node.stumps)
             except Exception:
                 avg_h = None
-
-            # --- Footer text on the Tree card ---
             footer = f"People: {people}| Stumps: {stumps}"
             if avg_h is not None:
                 footer += f"  (avg h≈{avg_h:.2f} m)"
@@ -1527,11 +1121,6 @@ class AppFigma:
             legal  = getattr(self.node, 'legal_cuts', 0)
             illegal = getattr(self.node, 'illegal_cuts', 0)
             self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(stumps)}")
-
-
-
-
-            # Audio / chainsaw detector
             if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
                 f0 = f"{self.node.audio_f0_hz:.0f} Hz" if self.node.audio_f0_hz is not None else "-- Hz"
                 cls = (self.node.audio_class or "—")
@@ -1542,39 +1131,27 @@ class AppFigma:
             else:
                 self._metric_set(self.card_audio, "-- Hz", "no signal")
 
-            # Speed (breadcrumb-based estimate)
             spd_ms = self._estimate_speed_ms()
             if spd_ms is not None:
                 self._metric_set(self.card_speed, f"{spd_ms:.1f} m/s", f"{spd_ms*3.6:.1f} km/h")
             else:
                 self._metric_set(self.card_speed, "-- m/s", "-- km/h")
 
-            # Home distance (distance from origin)
             if self.node.position_xy:
                 rx, ry = self.node.position_xy
                 dist = math.hypot(rx, ry)
                 self._metric_set(self.card_home, f"{dist:.0f} m", "Within bounds" if dist < 500 else "Far")
             else:
                 self._metric_set(self.card_home, "-- m", "")
-
-            # Flight time
             ft = int(time.time() - getattr(self.node, "_start_time", time.time()))
             self._metric_set(self.card_time, f"{ft//60:02d}:{ft%60:02d}", "Elapsed")
 
-            # Waypoints (from Path/PoseArray + nearest index)
-            # Waypoints via mission topics if present, else fall back to local estimate
             if getattr(self.node, "wp_total", 0) > 0:
                 self._metric_set(self.card_waypts, f"{self.node.wp_idx}/{self.node.wp_total}", "Completed")
             else:
                 wp_total = len(self.node.waypoints_xy) if self.node.waypoints_xy else 0
                 wp_done  = min(self.node.next_wp_idx, wp_total)
                 self._metric_set(self.card_waypts, f"{wp_done}/{wp_total}", "Completed")
-
-
-
-            # --- Odometry / IMU / Altitude panels ---
-
-            # Odometry
             xy = self.node.position_xy or (float('nan'), float('nan'))
             yaw = self.node.yaw_rad
             z = self._select_altitude()
@@ -1585,10 +1162,9 @@ class AppFigma:
                 f"Heading:    {(math.degrees(yaw) if yaw is not None else float('nan')):6.1f}"
             ))
 
-                        # --- IMU panel readout ---
             if self.node.imu_rpy:
                 r, p, y = self.node.imu_rpy
-                # acceleration text
+
                 if (self.node.accel_world is not None) or (self.node.accel_body is not None):
                     Ax, Ay, Az = (self.node.accel_world if self.node._imu_show_world else self.node.accel_body)
                     Amag = self.node.accel_mag if (self.node.accel_mag is not None) else float('nan')
@@ -1606,8 +1182,6 @@ class AppFigma:
             else:
                 self.lbl_imu.config(text="Roll:    Pitch:    Yaw:    \na: — m/s²")
 
-
-            # Altitude progress bar
             max_alt = max(1.0, float(self.node.get_parameter('max_altitude').value))
             cur_alt = z if (z is not None and math.isfinite(z)) else 0.0
             self.alt_pb["maximum"] = max_alt
@@ -1620,15 +1194,11 @@ class AppFigma:
             else:
                 self.alt_pb.configure(style="AltBar.Horizontal.TProgressbar")
 
-            # Status line (use your counters if you added them; otherwise simple)
-                        # Status line driven by /mission/state (fallbacks for safety)
             state = (self.mission_state or "").upper()
             if not state:
-                state = "PAUSED"  # default visual until we hear from main
+                state = "PAUSED" 
             self.lbl_status.config(text=f"Status: {state}")
 
-
-                        # Update chip style by state
             if state == "RUNNING":
                 self._mode_chip.config(text="RUNNING", bg="#E9FFF6", fg="#156F4B")
             elif state == "PAUSED":
@@ -1640,7 +1210,7 @@ class AppFigma:
 
 
         except Exception as e:
-            # keep the loop alive; throttle spam
+
             if not hasattr(self, "_pt_last_err") or (time.time() - getattr(self, "_pt_last_err", 0) > 2.0):
                 print("[poll_telemetry] error:", repr(e))
                 self._pt_last_err = time.time()
@@ -1651,7 +1221,7 @@ class AppFigma:
 
     def _set_estop_ui(self, active: bool):
         if active:
-            try: self.estop_banner.grid()  # show centered
+            try: self.estop_banner.grid() 
             except Exception: pass
             self.estop_btn.config(bg="#E07A7A", activebackground="#D86D6D")
         else:
@@ -1668,8 +1238,6 @@ class AppFigma:
             chip.bind("<Enter>", lambda e: chip.config(bg=hover_bg))
             chip.bind("<Leave>", lambda e: chip.config(bg=bg))
         return chip
-
-    # ------------------------------ Helpers (unchanged) -------------------------
     def _estimate_speed_ms(self):
         if len(self.node.breadcrumb) < 5:
             return None
@@ -1684,7 +1252,6 @@ class AppFigma:
             card.val_lbl.config(text=value)
             card.sub_lbl.config(text=subtext)
         except Exception:
-            # fallback if an older card was created differently
             for w in card.winfo_children():
                 w.destroy()
             ttk.Label(card, text=value, style="MetricValue.TLabel").pack(anchor="w")
@@ -1696,8 +1263,6 @@ class AppFigma:
             if v is not None and math.isfinite(v):
                 return v
         return None
-
-    # ------- drawing & clustering (unchanged from your file) -------
     @staticmethod
     def euclidean_clusters(pts_xy: List[Tuple[float, float]], eps: float = 0.3, min_pts: int = 4) -> List[List[Tuple[float, float]]]:
         if not pts_xy:
@@ -1758,7 +1323,7 @@ class AppFigma:
 
     def redraw_scatter(self, pts_xy: List[Tuple[float, float]], clusters: List[List[Tuple[float, float]]], *, src: str, frame: str, stamp: str, n: int, world=True):
         if world and self._fixed_view and (self.node.position_xy is not None):
-            x0, x1, y0, y1 = self._compute_bounds([], [])  # will use fixed range around robot
+            x0, x1, y0, y1 = self._compute_bounds([], [])  
         else:
             x0, x1, y0, y1 = self._compute_bounds(pts_xy, clusters)
                 
@@ -1911,12 +1476,9 @@ class AppFigma:
 
         self._static_bounds = (x0, x1, y0, y1)
 
-    # ------------------------------ Main loop ------------------------------
     def run(self):
         self.root.mainloop()
-
-# ========================= ICONS =========================
-ICONS_DIR = "./icons"  # change if your icons live elsewhere
+ICONS_DIR = "./icons"  
 
 class IconManager:
     """
@@ -1928,14 +1490,12 @@ class IconManager:
         self.cache = {}
 
     def get(self, name: str, size: int) -> Optional[ImageTk.PhotoImage]:
-        # key by (name, size) so we can reuse objects
         key = (name, size)
         if key in self.cache:
             return self.cache[key]
         try:
             path = os.path.join(self.base, name)
             if not os.path.isfile(path):
-                # Try with .png automatically if the user passed bare names
                 if not name.lower().endswith(".png"):
                     path = os.path.join(self.base, f"{name}.png")
             img = PILImage.open(path).convert("RGBA")
@@ -1945,48 +1505,7 @@ class IconManager:
             return ph
         except Exception:
             return None
-# ========================================================
 
-class ScrollableFrame(ttk.Frame):
-    """A vertical scrollable area that you can pack/place/grid widgets into via .body."""
-    def __init__(self, parent, *args, **kwargs):
-        super().__init__(parent, *args, **kwargs)
-        self.canvas = tk.Canvas(self, highlightthickness=0, bd=0)
-        self.vsb = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=self.vsb.set)
-
-        self.vsb.pack(side="right", fill="y")
-        self.canvas.pack(side="left", fill="both", expand=True)
-
-        # inner frame that actually holds widgets
-        self.body = ttk.Frame(self.canvas)
-        self._window = self.canvas.create_window((0, 0), window=self.body, anchor="nw")
-
-        # keep scrollregion sized to content
-        self.body.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
-        self.canvas.bind("<Configure>", self._on_canvas_configure)
-
-        # mouse wheel (cross-platform)
-        self._bind_mousewheel(self.canvas)
-
-    def _on_canvas_configure(self, event):
-        # keep inner frame width equal to canvas width
-        self.canvas.itemconfigure(self._window, width=event.width)
-
-    def _bind_mousewheel(self, widget):
-        # Windows/macOS
-        widget.bind_all("<MouseWheel>", self._on_mousewheel, add="+")
-        # Linux/X11
-        widget.bind_all("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"), add="+")
-        widget.bind_all("<Button-5>", lambda e: self.canvas.yview_scroll( 1, "units"), add="+")
-
-    def _on_mousewheel(self, event):
-        # On macOS event.delta is small; on Win it's multiples of 120
-        delta = -1 if event.delta > 0 else 1
-        self.canvas.yview_scroll(delta, "units")
-
-
-# ------------------------------ main ------------------------------
 def ros_spin(node: GuiNode):
     rclpy.spin(node)
 
