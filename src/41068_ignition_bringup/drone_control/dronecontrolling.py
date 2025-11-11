@@ -1,15 +1,70 @@
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
+import threading
+import time
+import rclpy
 
-class DroneController(Node): #Inherits from rclpy.node.Node, which provides the full ROS 2 communication interface: publishers, subscribers, timers, parameters, etc
+class DroneController(Node):
     def __init__(self):
-        super().__init__('drone_controller') 
-        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10) # creates a ROS publisher that sends linear and angluar velocity commands to the /cmd_vel topic in the ROS environment
+        super().__init__('drone_controller')
+        self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self.get_logger().info("[Drone Control] Drone is ready to be controlled")
 
-        self.timer = None           # active publishing timer
-        self.motion_queue = []      # list of (Twist, duration)
-        self.end_time = None        # end time for current motion
+        self.timer = None
+        self.motion_queue = []
+        self.end_time = None
+
+        # --- Altitude oscillation parameters ---
+        self.oscillate_thread = None
+        self.oscillate_active = threading.Event()
+        self.osc_dir = 1.0  # +1 up, -1 down
+        self.drone_min_height = 0.4
+        self.drone_max_height = 0.6
+        self.vert_speed = 0.1  # m/s
+
+    def start_altitude_oscillation(self):
+        """Start background thread for vertical oscillation."""
+        if self.oscillate_thread and self.oscillate_thread.is_alive():
+            self.get_logger().warn("Altitude oscillation already running.")
+            return
+
+        self.oscillate_active.set()
+        self.oscillate_thread = threading.Thread(target=self._altitude_loop, daemon=True)
+        self.oscillate_thread.start()
+        self.get_logger().info("[Drone Control] Altitude oscillation started.")
+
+    def stop_altitude_oscillation(self):
+        """Stop the oscillation loop."""
+        self.oscillate_active.clear()
+        self.get_logger().info("[Drone Control] Altitude oscillation stopped.")
+        # Send stop command for safety
+        stop_twist = Twist()
+        self.cmd_pub.publish(stop_twist)
+
+    def _altitude_loop(self):
+        """Runs continuously, flipping climb/descent at bounds."""
+        from drone_control.odometry_listener import OdometryListener
+        rate = 0.1  # 10 Hz
+        while self.oscillate_active.is_set() and rclpy.ok():
+
+            pose = OdometryListener.update()
+            if pose is None:
+                time.sleep(rate)
+                continue
+
+            z = pose[2]
+            twist = Twist()
+
+            # Flip direction if bounds exceeded
+            if z >= self.drone_max_height:
+                self.osc_dir = -1.0
+            elif z <= self.drone_min_height:
+                self.osc_dir = +1.0
+
+            twist.linear.z = self.vert_speed * self.osc_dir
+            self.cmd_pub.publish(twist)
+
+            time.sleep(rate)
 
     # ---- Movement functions ----
     def move_x(self, speed, duration): #Negative is reverse, positive is forward

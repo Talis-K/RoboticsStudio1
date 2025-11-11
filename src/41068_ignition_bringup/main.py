@@ -416,6 +416,7 @@ def main():
     OdometryListener._instance = odom
 
     controller = DroneController()
+    controller.start_altitude_oscillation()
 
     lidar_node = LidarDetection()
 
@@ -676,8 +677,6 @@ def main():
             # Publish the current waypoint being pursued
             msg = Float32MultiArray()
             msg.data = [float(wp[0]), float(wp[1])]
-            current_waypoint_pub.publish(msg)
-            avoidance_flag.clear()
             Mission.move_to(controller, wp)
 
         if total > 0:
@@ -691,6 +690,7 @@ def main():
         if rclpy.ok():
             try:
                 controller.stop()
+                controller.stop_altitude_oscillation()
             except Exception:
                 pass
             try:

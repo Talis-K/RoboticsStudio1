@@ -408,24 +408,6 @@ class LidarDetection(Node):
         return True
 
 
-    def _is_stump_by_extent(self, tree):
-        pts = tree['points']
-        if len(pts) < self.stump_min_points:
-            return False
-
-        # Bounding box in XY plane
-        minx, maxx = np.min(pts[:,0]), np.max(pts[:,0])
-        miny, maxy = np.min(pts[:,1]), np.max(pts[:,1])
-
-        width = maxx - minx
-        height = maxy - miny
-        diameter_est = max(width, height)
-
-        # Treat stump if footprint is within expected range
-        return (self.stump_radius_min*2 <= diameter_est <= self.stump_radius_max*2)
-
-
-
     def _publish_geometries_live(self):
         """Send every object (tree + person) as a Float32MultiArray right now."""
         self.geometries = []# Clear old geometry list
