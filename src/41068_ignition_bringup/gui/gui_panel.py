@@ -68,15 +68,12 @@ class GuiNode(Node):
         self.declare_parameter('estop_topic', '/e_stop')
         self.declare_parameter('max_altitude', 10.0)
 
-        # Extra (optional) topics for drone missions
-        self.declare_parameter('battery_topic', '/battery')
+
         self.declare_parameter('gps_topic', '/gps/fix')
         self.declare_parameter('imu_topic', '/imu')
         self.declare_parameter('flight_mode_topic', '/flight_mode')
 
-        # NEW: barometer & temperature
-        self.declare_parameter('baro_topic', '/baro')
-        self.declare_parameter('temperature_topic', '/temperature')
+        
 
         # Altitude source selection
         self.declare_parameter('altitude_mode', 'auto')
@@ -94,8 +91,9 @@ class GuiNode(Node):
         # Audio / Chainsaw detector topics
         self.declare_parameter('chainsaw_status_topic',  '/audio/chainsaw/status')   # std_msgs/String
         self.declare_parameter('chainsaw_metrics_topic', '/audio/chainsaw/metrics')  # std_msgs/Float32MultiArray [class_id, conf, f0_hz, band_power]
-
-
+        self.declare_parameter('battery_topic', '/battery')
+        self.declare_parameter('baro_topic', '/baro')
+        self.declare_parameter('temperature_topic', '/temperature')
 
         self.msg_queue = msg_queue
         self.img_queue = img_queue
@@ -115,7 +113,7 @@ class GuiNode(Node):
 
         from std_msgs.msg import Int32
 
-        self.tree_count: int   = 1
+        self.tree_count: int   = 0
         self.people_count: int = 0
         self.stump_count: int   = 0
 
@@ -124,7 +122,7 @@ class GuiNode(Node):
         sct = self.get_parameter('stump_count_topic').get_parameter_value().string_value or ''
         self.declare_parameter('legal_cut_count_topic',   '/mission/cuts_legal')
         self.declare_parameter('illegal_cut_count_topic', '/mission/cuts_illegal')
-        self.legal_cuts: int = 1
+        self.legal_cuts: int = 0
         self.illegal_cuts: int = 0
         lct = self.get_parameter('legal_cut_count_topic').get_parameter_value().string_value or ''
         ilct = self.get_parameter('illegal_cut_count_topic').get_parameter_value().string_value or ''
@@ -229,7 +227,7 @@ class GuiNode(Node):
         self._scan_keep_every = 2
         self._scan_min_valid = 0.03
 
-        # TF2 buffer/listener
+    
         self.tf_buffer = Buffer(cache_time=Duration(seconds=5.0))
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
@@ -306,7 +304,7 @@ class GuiNode(Node):
         self._aud_timer = self.create_timer(self._hop_len / max(1, self._fs), self._audio_process)
 
 
-    # ---- extra subscriptions ----
+ 
     def _subscribe_extras(self):
         bt = self.get_parameter('battery_topic').get_parameter_value().string_value
         if bt:
@@ -792,7 +790,7 @@ class GuiNode(Node):
             self._altitude_gps = float(msg.altitude)
 
     def on_start_clicked(self):
-    # your other GUI stuff...
+    
      self.mission_cmd_pub.publish(String(data='start'))
 
     def on_stop_clicked(self):
@@ -954,7 +952,7 @@ class AppFigma:
         self._hover_swap(self.lbl_sys, "TopTitle.TLabel", "TopTitleHover.TLabel")
         self._hover_swap(self.lbl_profile, "BadgeGrey.TLabel", "TopMetaHover.TLabel")
 
-        # === BODY GRID (2x2) ===================================================
+        # === BODY GRID  ===================================================
         body = ttk.Frame(self.root, padding=(16, 0, 16, 16), style="Bg.TFrame")
         body.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         body.columnconfigure(0, weight=3); body.columnconfigure(1, weight=2)
@@ -1102,15 +1100,15 @@ class AppFigma:
         btn_pause  = self._pill(mc, " Pause",  "#F5A623", self._send_cmd, "pause",  icon=("pause",18))
         btn_resume = self._pill(mc, " Resume", "#4A7BD0", self._send_cmd, "resume", icon=("resume",18))
         for r in (0, 1, 2): mc.rowconfigure(r, weight=1)  # extend grid
-        btn_rtl  = self._pill(mc, " RTL",  "#A855F7", self._send_cmd, "rtl",  icon=("rtl",18))
-        btn_land = self._pill(mc, " Land", "#22D3EE", self._send_cmd, "land", icon=("land",18))
+        # btn_rtl  = self._pill(mc, " RTL",  "#A855F7", self._send_cmd, "rtl",  icon=("rtl",18))
+        # btn_land = self._pill(mc, " Land", "#22D3EE", self._send_cmd, "land", icon=("land",18))
 
         btn_start .grid(row=0, column=0, sticky="nsew", padx=(0,6), pady=(0,6))
         btn_stop  .grid(row=0, column=1, sticky="nsew", padx=(6,0), pady=(0,6))
         btn_pause .grid(row=1, column=0, sticky="nsew", padx=(0,6), pady=(6,0))
         btn_resume.grid(row=1, column=1, sticky="nsew", padx=(6,0), pady=(6,0))
-        btn_rtl .grid(row=2, column=0, sticky="nsew", padx=(0,6), pady=(6,0))
-        btn_land.grid(row=2, column=1, sticky="nsew", padx=(6,0), pady=(6,0))
+        # btn_rtl .grid(row=2, column=0, sticky="nsew", padx=(0,6), pady=(6,0))
+        # btn_land.grid(row=2, column=1, sticky="nsew", padx=(6,0), pady=(6,0))
 
 
 

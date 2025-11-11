@@ -213,7 +213,7 @@ class Mission(Node):
         #----------------------------------------------------------------------
 
         #---------------------- Sound HOLD engaged check ----------------------
-            if hold_flag.is_set():   # NEW: silently hold here while motors are stopped
+            if hold_flag.is_set():   # silently hold here while motors are stopped
                 try:
                     controller.stop()
                 except Exception:
@@ -240,7 +240,7 @@ class Mission(Node):
         #----------------------------------------------------------------------
 
         #---------------------- Sound HOLD engaged check ----------------------
-            if hold_flag.is_set():   # NEW: fully stopped during HOLD
+            if hold_flag.is_set():   # fully stopped during HOLD
                 try:
                     controller.stop()
                 except Exception:
@@ -302,7 +302,7 @@ class Mission(Node):
         #----------------------------------------------------------------------
 
         #-------------------- Sound HOLD engaged check ----------------------
-            if hold_flag.is_set():   # NEW: fully stopped during HOLD
+            if hold_flag.is_set():   # fully stopped during HOLD
                 try:
                     controller.stop()
                 except Exception:
@@ -334,7 +334,7 @@ class Mission(Node):
 
 
 
-                        # --- NEW: if blocked and we still have budget, visit a tangent sub-goal first
+                        # --- if blocked and we still have budget, visit a tangent sub-goal first
             if blocker and subgoals_done < MAX_SUBGOALS:
                 try:
                     cx, cy, R = blocker
@@ -444,7 +444,7 @@ def main():
     pub_prog  = controller.create_publisher(Float32, '/mission/progress', 10)
 
 
-        # NEW: --- Sound-triggered full-stop (no GUI pause) ---
+        # --- Sound-triggered full-stop (no GUI pause) ---
     _hold_lock = threading.Lock()      # prevent overlapping holds
     _hold_timer = None                 # threading.Timer for auto-resume
     _last_hold_ts = 0.0                # debounce timestamp (epoch)
@@ -455,7 +455,7 @@ def main():
     
 
     def _trigger_timed_hold(seconds: float, reason: str = "sound"):
-        """NEW: Immediately stop motors, set an internal hold for `seconds`, then auto-resume."""
+        """ Immediately stop motors, set an internal hold for `seconds`, then auto-resume."""
         nonlocal _hold_timer, _last_hold_ts
         with _hold_lock:
             now = time.time()
@@ -481,7 +481,7 @@ def main():
             _hold_timer.start()
 
     def _clear_hold():
-        """NEW: Clear hold and let loops proceed (if not E-STOP)."""
+        """ Clear hold and let loops proceed (if not E-STOP)."""
         nonlocal _hold_timer
         with _hold_lock:
             _hold_timer = None
