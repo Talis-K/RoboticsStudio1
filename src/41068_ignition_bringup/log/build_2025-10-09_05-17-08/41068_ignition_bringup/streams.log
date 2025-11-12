@@ -1,0 +1,138 @@
+[0.014s] Invoking command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/student/RoboticsStudio1/src/41068_ignition_bringup -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup
+[0.079s] -- The C compiler identification is GNU 11.4.0
+[0.149s] -- The CXX compiler identification is GNU 11.4.0
+[0.157s] -- Detecting C compiler ABI info
+[0.237s] -- Detecting C compiler ABI info - done
+[0.247s] -- Check for working C compiler: /usr/bin/cc - skipped
+[0.248s] -- Detecting C compile features
+[0.248s] -- Detecting C compile features - done
+[0.252s] -- Detecting CXX compiler ABI info
+[0.349s] -- Detecting CXX compiler ABI info - done
+[0.360s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[0.362s] -- Detecting CXX compile features
+[0.362s] -- Detecting CXX compile features - done
+[0.387s] -- Found ament_cmake: 1.3.12 (/opt/ros/humble/share/ament_cmake/cmake)
+[0.570s] -- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+[0.650s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[0.681s] -- Found ros_ign_interfaces: 0.244.20 (/opt/ros/humble/share/ros_ign_interfaces/cmake)
+[0.737s] -- Found rosidl_generator_c: 3.1.7 (/opt/ros/humble/share/rosidl_generator_c/cmake)
+[0.748s] -- Found rosidl_adapter: 3.1.7 (/opt/ros/humble/share/rosidl_adapter/cmake)
+[0.758s] -- Found rosidl_generator_cpp: 3.1.7 (/opt/ros/humble/share/rosidl_generator_cpp/cmake)
+[0.796s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.829s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[1.034s] WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+[1.060s] -- Found ament_lint_auto: 0.12.14 (/opt/ros/humble/share/ament_lint_auto/cmake)
+[1.132s] WARNING: Package name "41068_ignition_bringup" does not follow the naming conventions. It should start with a lower case letter and only contain lower case letters, digits, underscores, and dashes.
+[1.172s] -- Added test 'copyright' to check source files copyright and LICENSE
+[1.182s] -- Added test 'cppcheck' to perform static code analysis on C / C++ code
+[1.182s] -- Configured cppcheck include dirs: 
+[1.182s] -- Configured cppcheck exclude dirs and/or files: 
+[1.190s] -- Added test 'cpplint' to check C / C++ code against the Google style
+[1.190s] -- Configured cpplint exclude dirs and/or files: 
+[1.192s] -- Added test 'flake8' to check Python code syntax and style conventions
+[1.195s] -- Added test 'lint_cmake' to check CMake code style
+[1.196s] -- Added test 'pep257' to check Python code against some of the docstring style conventions in PEP 257
+[1.204s] -- Added test 'uncrustify' to check C / C++ code style
+[1.204s] -- Configured uncrustify additional arguments: 
+[1.205s] -- Added test 'xmllint' to check XML markup files
+[1.207s] -- Configuring done
+[1.216s] -- Generating done
+[1.220s] -- Build files have been written to: /home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup
+[1.233s] Invoked command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake /home/student/RoboticsStudio1/src/41068_ignition_bringup -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup
+[1.236s] Invoking command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup -- -j8 -l8
+[1.304s] Built target ament_cmake_python_symlink_lidar_processing
+[1.664s] running egg_info
+[1.665s] creating lidar_processing.egg-info
+[1.665s] writing lidar_processing.egg-info/PKG-INFO
+[1.665s] writing dependency_links to lidar_processing.egg-info/dependency_links.txt
+[1.666s] writing top-level names to lidar_processing.egg-info/top_level.txt
+[1.666s] writing manifest file 'lidar_processing.egg-info/SOURCES.txt'
+[1.686s] reading manifest file 'lidar_processing.egg-info/SOURCES.txt'
+[1.687s] writing manifest file 'lidar_processing.egg-info/SOURCES.txt'
+[1.723s] Built target ament_cmake_python_build_lidar_processing_egg
+[1.736s] Invoked command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --build /home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup -- -j8 -l8
+[1.748s] Invoking command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup
+[1.756s] -- Install configuration: ""
+[1.756s] -- Execute custom install script
+[1.757s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.sh
+[1.767s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/pythonpath.dsv
+[1.777s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info/PKG-INFO
+[1.786s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info/SOURCES.txt
+[1.795s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info/dependency_links.txt
+[1.805s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing-1.0.3-py3.10.egg-info/top_level.txt
+[1.816s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/__init__.py
+[1.830s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/filtered_lidar.py
+[1.839s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/tree_detector.py
+[1.849s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/lib/41068_ignition_bringup/filtered_lidar.py
+[1.859s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/lib/41068_ignition_bringup/tree_detector.py
+[1.869s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/lib/41068_ignition_bringup/gui_panel.py
+[1.878s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/scripts/gui_panel.py
+[1.887s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/41068.rviz
+[1.896s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/ekf_odom.yaml
+[1.906s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/gazebo_bridge.yaml
+[1.917s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/nav2_params.yaml
+[1.930s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/robot_localization.yaml
+[1.940s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/config/slam_params.yaml
+[1.950s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_ignition.launch.py
+[1.959s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_ignition_drone.launch.py
+[1.968s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/launch/41068_navigation.launch.py
+[1.978s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_plane/materials/textures/empty_grass.png
+[1.987s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_plane/materials/textures/forest_overhead.png
+[1.996s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_plane/materials/textures/leaf_litter.png
+[2.005s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_plane/model.config
+[2.017s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_plane/model.sdf
+[2.031s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_wall/materials/textures/forest_wall.png
+[2.041s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_wall/materials/textures/forest_wall_transparent.png
+[2.051s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_wall/materials/textures/forest_wall_transparent_small.png
+[2.061s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_wall/model.config
+[2.071s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/forest_wall/model.sdf
+[2.080s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/grass_plane/materials/textures/empty_grass.png
+[2.090s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/grass_plane/model.config
+[2.099s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/models/grass_plane/model.sdf
+[2.108s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/common_properties.urdf.xacro
+[2.122s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/husky.gazebo.xacro
+[2.135s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/husky.urdf.xacro
+[2.145s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/base_link.dae
+[2.155s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/bumper.dae
+[2.164s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/jpl04_arch_nosensor.stl
+[2.173s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/top_chassis.dae
+[2.182s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/top_plate.dae
+[2.192s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/meshes/wheel.dae
+[2.201s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf/wheel.urdf.xacro
+[2.210s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/worlds/large_demo.sdf
+[2.227s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/worlds/simple_trees.sdf
+[2.238s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/common_properties.urdf.xacro
+[2.249s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/hull.dae
+[2.258s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_fl.dae
+[2.268s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_fr.dae
+[2.277s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_rl.dae
+[2.286s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/meshes/propeller_rr.dae
+[2.294s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/model.config
+[2.303s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/model.sdf
+[2.313s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/parrot.gazebo.xacro
+[2.327s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/parrot.urdf.xacro
+[2.337s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/1.png
+[2.347s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/2.png
+[2.357s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/3.png
+[2.367s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/4.png
+[2.378s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/urdf_drone/thumbnails/5.png
+[2.388s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/ament_index/resource_index/package_run_dependencies/41068_ignition_bringup
+[2.398s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/ament_index/resource_index/parent_prefix_path/41068_ignition_bringup
+[2.408s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/ament_prefix_path.sh
+[2.422s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/ament_prefix_path.dsv
+[2.434s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/path.sh
+[2.445s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/environment/path.dsv
+[2.455s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/local_setup.bash
+[2.465s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/local_setup.sh
+[2.475s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/local_setup.zsh
+[2.485s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/local_setup.dsv
+[2.494s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/package.dsv
+[2.504s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/ament_index/resource_index/packages/41068_ignition_bringup
+[2.515s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/cmake/41068_ignition_bringupConfig.cmake
+[2.528s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/cmake/41068_ignition_bringupConfig-version.cmake
+[2.539s] -- Symlinking: /home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/share/41068_ignition_bringup/package.xml
+[2.601s] Listing '/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing'...
+[2.601s] Compiling '/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/__init__.py'...
+[2.601s] Compiling '/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/filtered_lidar.py'...
+[2.601s] Compiling '/home/student/RoboticsStudio1/src/41068_ignition_bringup/install/41068_ignition_bringup/local/lib/python3.10/dist-packages/lidar_processing/tree_detector.py'...
+[2.609s] Invoked command in '/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup' returned '0': CMAKE_PREFIX_PATH=/opt/ros/humble /usr/bin/cmake --install /home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup

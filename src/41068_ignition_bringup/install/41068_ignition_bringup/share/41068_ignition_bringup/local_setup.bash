@@ -1,0 +1,1 @@
+/home/student/RoboticsStudio1/src/41068_ignition_bringup/build/41068_ignition_bringup/ament_cmake_environment_hooks/local_setup.bash
