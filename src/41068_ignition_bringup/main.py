@@ -73,6 +73,8 @@ MAX_SUBGOALS = 3       # avoid infinite detours
 def _now_s() -> float:
     return time.time()
 
+
+# Essentailly the obstacle detection acts as sort of cone for the lidar to reference
 def _forward_cone_blocked(pose, obstacles, cone_deg=50.0, stop_dist=3.2) -> bool:
     """
     True if an inflated obstacle center is inside a yaw-centered cone within stop_dist.
@@ -382,12 +384,6 @@ class Mission(Node):
                 except Exception:
                     # If detour math fails, fall through and try straight motion
                     pass
-
-
-            # try:
-            #     
-            # except Exception:
-            #     blocker = None  # if anything goes wrong, just fly straight
 
             
 

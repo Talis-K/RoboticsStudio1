@@ -293,6 +293,7 @@ class GuiNode(Node):
     def _on_wp_idx(self, v): self.wp_idx = int(v)
     def _on_wp_total(self, v): self.wp_total = int(v)
     def engage_estop(self):
+        """Publishes True on `/e_stop` topic and sets local `_estop = True`."""
         if not self._estop:
             self._estop = True
             try:
@@ -300,6 +301,7 @@ class GuiNode(Node):
             except Exception:
                 pass
     def reset_estop(self):
+        """Publishes False on `/e_stop` topic and sets local `_estop = False`."""
         if self._estop:
             self._estop = False
             try:
@@ -307,10 +309,13 @@ class GuiNode(Node):
             except Exception:
                 pass
     def estop_active(self) -> bool:
+        """Returns current E-STOP state (local cache)."""
         return self._estop
     def on_estop_msg(self, msg: Bool):
+        """Callback: updates local E-STOP state from incoming `/e_stop` messages."""
         self._estop = bool(msg.data)
     def _ensure_camera_subscription(self, initial: bool = False):
+        """Dynamically discovers and subscribes to the first available image topic."""
         if self._img_sub is not None:
             if self._discovery_timer:
                 self._discovery_timer.cancel()
@@ -398,6 +403,7 @@ class GuiNode(Node):
         elif st in ("RUNNING", "PAUSED", "IDLE", "STOPPED", "RTL", "LAND"):
             self._estop = False
     def _resolve_camera_topic(self, requested: str):
+        """Scans ROS network for raw or compressed image topics; returns (topic, type)."""
         if requested:
             for n, ts in self.get_topic_names_and_types():
                 if n == requested and (RAW_IMAGE_TYPE in ts or COMP_IMAGE_TYPE in ts):
@@ -467,6 +473,7 @@ class GuiNode(Node):
         except Exception:
             pass
     def on_scan(self, msg: LaserScan):
+        """Processes LaserScan → XY points, applies TF to world frame, pushes to `msg_queue`."""
         stamp_ns = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
         if self._last_scan_stamp_ns is not None and stamp_ns < self._last_scan_stamp_ns:
             return
@@ -523,6 +530,7 @@ class GuiNode(Node):
         except queue.Full:
             pass
     def on_cloud(self, msg: PointCloud2):
+        """Extracts (x,y) from PointCloud2, pushes to `msg_queue`."""
         if self._estop:
             return
         pts = []
@@ -539,6 +547,7 @@ class GuiNode(Node):
         except queue.Full:
             pass
     def on_image_raw(self, msg: Image):
+        """Decodes raw image (RGB/BGR/mono), converts to PIL, pushes to `img_queue`."""
         if self._estop:
             return
         try:
@@ -552,6 +561,7 @@ class GuiNode(Node):
         except Exception:
             pass
     def on_image_compressed(self, msg: CompressedImage):
+        """Decodes JPEG/PNG from CompressedImage, converts to PIL, pushes to `img_queue`."""
         if self._estop:
             return
         try:
@@ -561,6 +571,7 @@ class GuiNode(Node):
         except Exception:
             pass
     def on_odom(self, msg: Odometry):
+        """Extracts position (x,y,z), yaw, updates breadcrumb trail."""
         p = msg.pose.pose.position
         self._altitude_odom = float(p.z)
         self.position_xy = (float(p.x), float(p.y))
@@ -578,6 +589,7 @@ class GuiNode(Node):
     def on_flight_mode(self, msg: String):
         self.flight_mode = msg.data.strip()
     def on_imu(self, msg: Imu):
+        """Computes RPY, transforms acceleration to world frame (optional gravity comp)."""
         q = msg.orientation
         sinr_cosp = 2 * (q.w * q.x + q.y * q.z)
         cosr_cosp = 1 - 2 * (q.x * q.x + q.y * q.y)
@@ -600,17 +612,8 @@ class GuiNode(Node):
         self.accel_world = self._ema(self.accel_world, a_world, self._accel_alpha)
         Ax, Ay, Az = (self.accel_world if self._imu_show_world else self.accel_body)
         self.accel_mag = math.sqrt(Ax*Ax + Ay*Ay + Az*Az)
-    def on_baro(self, msg: FluidPressure):
-        if math.isfinite(msg.fluid_pressure) and msg.fluid_pressure > 0:
-            self.baro_pressure_pa = float(msg.fluid_pressure)
-            T_k = (self.temperature_c + 273.15) if (self.temperature_c is not None and math.isfinite(self.temperature_c)) else 288.15
-            self._altitude_baro = _hypsometric_altitude(self.baro_pressure_pa, T_k, self._p0_pa)
-    def on_temperature(self, msg: Temperature):
-        if math.isfinite(msg.temperature):
-            self.temperature_c = float(msg.temperature)
-            if self.baro_pressure_pa is not None:
-                T_k = self.temperature_c + 273.15
-                self._altitude_baro = _hypsometric_altitude(self.baro_pressure_pa, T_k, self._p0_pa)
+
+
     def on_path(self, msg: Path):
         pts = [(p.pose.position.x, p.pose.position.y) for p in msg.poses] if msg.poses else []
         self.waypoints_xy = pts
@@ -646,13 +649,13 @@ class AppFigma:
     • Polls two queues in the main thread:
         - `q_img`: updates camera feed (resizes, displays with resolution info)
         - `q_scan`: redraws LiDAR map with:
-            → Raw points
-            → Clustered objects (convex hulls)
-            → Robot pose (triangle with heading)
-            → Waypoints (current highlighted)
-            → Breadcrumb trail
-            → Tree detections
-            → Dynamic grid with 1m scale
+             Raw points
+             Clustered objects (convex hulls)
+             Robot pose (triangle with heading)
+             Waypoints (current highlighted)
+            Breadcrumb trail
+             Tree detections
+             Dynamic grid with 1m scale
     
     • Updates **real-time telemetry cards** every 300ms:
         - Tree / People / Stump / Legal/Illegal Cut counts
@@ -663,7 +666,7 @@ class AppFigma:
         - Waypoint progress
         - Odometry (X/Y/Z/Heading)
         - IMU (RPY + acceleration vector)
-        - Altitude progress bar (color-coded: green → yellow → red)
+        - Altitude progress bar (color-coded: green  yellow  red)
     
     • Provides **interactive controls**:
         - E-STOP button (red, with banner on activation)
@@ -729,7 +732,7 @@ class AppFigma:
         self.tree_cuts_var = tk.StringVar(value="Legal: 0 | Illegal: 0")
         self._add_inline_right_of_value(self.card_tree, self.tree_cuts_var)
         self._add_footer_counter(self.card_tree, self.tree_people_var)
-        self.card_audio = self._metric_card(metrics, "Audio (Hz)", "-- Hz", "", 1, icon=("mic",16))
+        self.card_audio = self._metric_card(metrics, "Audio (Hz)", "-- Hz", "", 1, icon=("mic",16))
         self.card_speed = self._metric_card(metrics, "Speed", "-- m/s", "-- km/h", 2, icon=("speed",16))
         self.card_home = self._metric_card(metrics, "Home Dist", "-- m", "Within bounds", 3, icon=("home",16))
         self.card_time = self._metric_card(metrics, "Flight Time","00:00", "Elapsed", 4, icon=("time",16))
@@ -858,7 +861,7 @@ class AppFigma:
         lid_hdr.pack(fill="x")
         ttk.Label(lid_hdr, text="LiDAR Map", style="BannerCyan.TLabel",
                 image=self.icons.get("lidar",16), compound="left").pack(side="left", padx=10, pady=8)
-        self._chip(lid_hdr, "360� Scan Active", bg="#E6FAFF", fg="#116B7A", hover_bg="#D2F4FF")
+        self._chip(lid_hdr, "360  Scan Active", bg="#E6FAFF", fg="#116B7A", hover_bg="#D2F4FF")
         lid_body = ttk.Frame(lidar, style="Card.TFrame", padding=0)
         lid_body.pack(fill="both", expand=True)
         self.canvas = tk.Canvas(lid_body, height=300, bg="#FAFBFD", highlightthickness=0)
@@ -908,6 +911,7 @@ class AppFigma:
         self.root.bind("<space>", lambda e: self.on_estop_press())
         self.root.bind("<r>", lambda e: self.on_estop_reset())
     def _apply_theme(self):
+        """Configures ttk styles to match Figma: colors, fonts, hover states, banners."""
         style = ttk.Style()
         try: style.theme_use('clam')
         except Exception: pass
@@ -974,6 +978,7 @@ class AppFigma:
         frame = ttk.Frame(wrap, style="Card.TFrame"); frame.pack(fill="both", expand=True)
         return frame
     def _metric_card(self, parent, title, value, sub, idx, icon=None):
+        """Creates a telemetry card with title, large value, subtitle, optional icon."""
         card = ttk.Labelframe(parent, text=title, padding=(12,8, 6, 0), style="Card.TLabelframe")
         card.grid(row=0, column=idx, sticky="nsew", padx=8, pady=(4,8))
         parent.grid_columnconfigure(idx, weight=1)
@@ -1028,12 +1033,15 @@ class AppFigma:
         if name_img: lbl.image = name_img
         return lbl
     def on_estop_press(self):
+        """Publishes mission command (start/pause/resume/stop) and updates local state."""
         self.node.engage_estop()
         self._set_estop_ui(True)
     def on_estop_reset(self):
+        """Publishes mission command (start/pause/resume/stop) and updates local state."""
         self.node.reset_estop()
         self._set_estop_ui(False)
     def _send_cmd(self, cmd: str):
+        """Publishes mission command (start/pause/resume/stop) and updates local state."""
         try:
             self.node.mission_cmd_pub.publish(String(data=cmd))
             if cmd == "start": self.node.mission_state = "RUNNING"
@@ -1059,6 +1067,7 @@ class AppFigma:
             self.cam_label.configure(image=photo, text="")
         self.root.after(50, self.poll_img)
     def poll_scan(self):
+        """Pulls scan/cloud data, performs clustering, redraws LiDAR canvas at ≤20 FPS."""
         item = None
         try:
             while True:
@@ -1090,6 +1099,7 @@ class AppFigma:
         lbl.place(in_=card.val_lbl, relx=1.0, rely=0.55, x=12, anchor="w")
         card.inline_right_lbl = lbl
     def poll_telemetry(self):
+        """Refreshes all metric cards, odometry, IMU, altitude bar, mission status."""
         try:
             bp = self.node.battery_pct
             self.lbl_tel.config(text=f"Telemetry: {bp*100:.0f}%" if bp is not None else "Telemetry: 100%")
@@ -1125,7 +1135,7 @@ class AppFigma:
             self.tree_cuts_var.set(f"Legal: {int(legal)} | Illegal: {int(stumps)}")
             if (self.node.audio_f0_hz is not None) or (self.node.audio_class is not None):
                 f0 = f"{self.node.audio_f0_hz:.0f} Hz" if self.node.audio_f0_hz is not None else "-- Hz"
-                cls = (self.node.audio_class or "")
+                cls = (self.node.audio_class or "")
                 sub = f"{cls} ({self.node.audio_conf:.2f})" if (
                     self.node.audio_conf is not None and math.isfinite(self.node.audio_conf)
                 ) else cls
@@ -1168,16 +1178,16 @@ class AppFigma:
                     frame_tag = "world" if self.node._imu_show_world else "body"
                     gtag = " (gravity-comp)" if self.node._imu_gravity_comp and self.node._imu_show_world else ""
                     self.lbl_imu.config(
-                        text=f"Roll: {math.degrees(r):.1f}� Pitch: {math.degrees(p):.1f}� Yaw: {math.degrees(y):.1f}�\n"
-                            f"a[{frame_tag}]{gtag}: Ax={Ax:.2f} Ay={Ay:.2f} Az={Az:.2f} |a|={Amag:.2f} m/s�"
+                        text=f"Roll: {math.degrees(r):.1f}  Pitch: {math.degrees(p):.1f}  Yaw: {math.degrees(y):.1f} \n"
+                            f"a[{frame_tag}]{gtag}: Ax={Ax:.2f} Ay={Ay:.2f} Az={Az:.2f} |a|={Amag:.2f} m/s "
                     )
                 else:
                     self.lbl_imu.config(
-                        text=f"Roll: {math.degrees(r):.1f}� Pitch: {math.degrees(p):.1f}� Yaw: {math.degrees(y):.1f}�\n"
-                            f"a:  m/s�"
+                        text=f"Roll: {math.degrees(r):.1f}  Pitch: {math.degrees(p):.1f}  Yaw: {math.degrees(y):.1f} \n"
+                            f"a:   m/s "
                     )
             else:
-                self.lbl_imu.config(text="Roll: Pitch: Yaw: \na:  m/s�")
+                self.lbl_imu.config(text="Roll: Pitch: Yaw: \na:   m/s ")
             max_alt = max(1.0, float(self.node.get_parameter('max_altitude').value))
             cur_alt = z if (z is not None and math.isfinite(z)) else 0.0
             self.alt_pb["maximum"] = max_alt

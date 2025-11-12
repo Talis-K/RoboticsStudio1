@@ -9,7 +9,7 @@ from rclpy.qos import (
 )
 from geometry_msgs.msg import PoseArray, Pose
 
-
+# Creates a series of coordinates arranged in a snake-like pattern
 def generate_snake_right_angles(min_x=-5.0, max_x=5.0,
                                 min_y=-5.0, max_y=5.0,
                                 step_y=1.0, z=0.5):
@@ -19,6 +19,7 @@ def generate_snake_right_angles(min_x=-5.0, max_x=5.0,
     to_right = True
     wps.append((min_x, y, z))
 
+    # Continue generating rows until the top limit (max_y) is reached
     while y <= max_y:
         if to_right:
             wps.append((max_x, y, z))
@@ -39,7 +40,7 @@ class WaypointPublisher(Node):
     def __init__(self):
         super().__init__('waypoint_publisher')
 
-        # Latched QoS so late subscribers still receive the last message
+        # Sends last published message to any new subscribers
         q = QoSProfile(depth=1)
         q.durability  = QoSDurabilityPolicy.TRANSIENT_LOCAL
         q.reliability = QoSReliabilityPolicy.RELIABLE
@@ -47,7 +48,7 @@ class WaypointPublisher(Node):
 
         self.pub = self.create_publisher(PoseArray, 'snake_waypoints', q)
 
-        # Generate waypoints
+        # Generate waypoints (values can be modified depending on search area and search density preference)
         coords = generate_snake_right_angles(
             min_x=-5.0, max_x=5.0, min_y=-5.0, max_y=5.0, step_y=1.0, z=0.5
         )
@@ -58,7 +59,7 @@ class WaypointPublisher(Node):
         for i, (x, y, z) in enumerate(coords):
             print(f"{i:02d}: x={x:.2f}, y={y:.2f}, z={z:.2f}")
 
-        # Build PoseArray
+        # Builds the PoseArray containing the waypoints
         self.msg = PoseArray()
         self.msg.header.frame_id = 'map'
         for (x, y, z) in coords:
@@ -76,12 +77,12 @@ class WaypointPublisher(Node):
             f"Publishing {len(self.msg.poses)} waypoints on /snake_waypoints"
         )
     
-
+    # Adds the current time to the PoseArray message and publishes it
     def _publish(self):
         self.msg.header.stamp = self.get_clock().now().to_msg()
         self.pub.publish(self.msg)
 
-
+# Allows the waypoints to be accessed by other modules
 class Goals():
     def position(self):
         self.coords = generate_snake_right_angles(
