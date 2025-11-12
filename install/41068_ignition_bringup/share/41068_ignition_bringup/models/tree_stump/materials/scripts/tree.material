@@ -1,0 +1,14 @@
+material My/Tree
+{
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture bark.png
+      }
+    }
+  }
+}
+

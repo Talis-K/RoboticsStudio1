@@ -27,6 +27,7 @@
   <exec_depend>python3-numpy</exec_depend>  <!-- For NumPy -->
   <exec_depend>python3-scipy</exec_depend>  <!-- For medfilt -->
   <exec_depend>python3-sklearn</exec_depend>  <!-- For scikit-learn -->
+  <exec_depend>audio_common_msgs</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

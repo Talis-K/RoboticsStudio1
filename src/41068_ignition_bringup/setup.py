@@ -39,6 +39,10 @@ setup(
         'console_scripts': [
             # console-name  =  module.path:function
             'gui_panel = bringup_41068.gui_panel:main',
+            'chainsaw_detector_node = chainsaw_detector2.chainsaw_detector_node:main',
+            'main = 41068_ignition_bringup.main:main',
+
+
         ],
     },
 )

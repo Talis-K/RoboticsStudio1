@@ -1,5 +1,7 @@
+setup.cfg
 setup.py
 lidar_processing/__init__.py
+lidar_processing/all_lidar_processing.py
 lidar_processing/filtered_lidar.py
 lidar_processing/tree_detector.py
 lidar_processing.egg-info/PKG-INFO

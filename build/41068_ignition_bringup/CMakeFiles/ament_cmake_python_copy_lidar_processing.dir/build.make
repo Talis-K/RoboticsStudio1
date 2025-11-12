@@ -53,10 +53,10 @@ RM = /usr/bin/cmake -E rm -f
 EQUALS = =
 
 # The top-level source directory on which CMake was run.
-CMAKE_SOURCE_DIR = /home/student/RoboticsStudio1/src/41068_ignition_bringup
+CMAKE_SOURCE_DIR = /home/talis/RoboticsStudio1/src/41068_ignition_bringup
 
 # The top-level build directory on which CMake was run.
-CMAKE_BINARY_DIR = /home/student/RoboticsStudio1/build/41068_ignition_bringup
+CMAKE_BINARY_DIR = /home/talis/RoboticsStudio1/build/41068_ignition_bringup
 
 # Utility rule file for ament_cmake_python_copy_lidar_processing.
 
@@ -67,7 +67,7 @@ include CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/compiler_depend.
 include CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/progress.make
 
 CMakeFiles/ament_cmake_python_copy_lidar_processing:
-	/usr/bin/cmake -E copy_directory /home/student/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing /home/student/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing
+	/usr/bin/cmake -E copy_directory /home/talis/RoboticsStudio1/src/41068_ignition_bringup/lidar_processing /home/talis/RoboticsStudio1/build/41068_ignition_bringup/ament_cmake_python/lidar_processing/lidar_processing
 
 ament_cmake_python_copy_lidar_processing: CMakeFiles/ament_cmake_python_copy_lidar_processing
 ament_cmake_python_copy_lidar_processing: CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/build.make
@@ -82,6 +82,6 @@ CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/clean:
 .PHONY : CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/clean
 
 CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/depend:
-	cd /home/student/RoboticsStudio1/build/41068_ignition_bringup && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/student/RoboticsStudio1/src/41068_ignition_bringup /home/student/RoboticsStudio1/src/41068_ignition_bringup /home/student/RoboticsStudio1/build/41068_ignition_bringup /home/student/RoboticsStudio1/build/41068_ignition_bringup /home/student/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/DependInfo.cmake --color=$(COLOR)
+	cd /home/talis/RoboticsStudio1/build/41068_ignition_bringup && $(CMAKE_COMMAND) -E cmake_depends "Unix Makefiles" /home/talis/RoboticsStudio1/src/41068_ignition_bringup /home/talis/RoboticsStudio1/src/41068_ignition_bringup /home/talis/RoboticsStudio1/build/41068_ignition_bringup /home/talis/RoboticsStudio1/build/41068_ignition_bringup /home/talis/RoboticsStudio1/build/41068_ignition_bringup/CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/DependInfo.cmake --color=$(COLOR)
 .PHONY : CMakeFiles/ament_cmake_python_copy_lidar_processing.dir/depend
 

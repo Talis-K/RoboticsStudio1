@@ -64,7 +64,7 @@
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Oak%20tree
       </uri>
       <name>oak2</name>
-      <pose>-4.5 5.0 0 0 0 -1.5708</pose>
+      <pose>-5.5 6.5 0 0 0 -1.5708</pose>
     </include>
     <include>
       <uri>
@@ -74,7 +74,7 @@
       <pose>6.0 -6.0 0 0 0 0</pose>
     </include>
 
-<!-- Pine trees -->
+    <!-- Pine trees -->
     <include>
       <uri>
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
@@ -87,7 +87,7 @@
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
       </uri>
       <name>pine2</name>
-      <pose>-5.0 -1.0 0 0 0 0</pose>
+      <pose>-5.0 -2.0 0 0 0 0</pose>
     </include>
     <include>
       <uri>
@@ -101,15 +101,34 @@
         https://fuel.gazebosim.org/1.0/OpenRobotics/models/Pine%20tree
       </uri>
       <name>pine4</name>
-      <pose>-3.5 -4.0 0 0 0 0</pose>
+      <pose>-4 -5.0 0 0 0 0</pose>
     </include>
 
-    <!-- Human -->
-        <!-- Human -->
+<!-- Walking Person -->
     <include>
-      <uri>https://fuel.gazebosim.org/1.0/OpenRobotics/models/Standing%20person</uri>
+      <uri>model://walking_person</uri>
       <name>human1</name>
-      <pose>0 2 0 0 0 0</pose>
+      <pose>-2 0 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>model://walking_person</uri>
+      <name>human2</name>
+      <pose>2.5 3 0 0 0 1.2</pose>
+    </include>
+    <include>
+      <uri>model://walking_person</uri>
+      <name>human3</name>
+      <pose>4 -6 0 0 0 2.0</pose>
+    </include>
+    <include>
+    <uri>../models/tree_stump</uri>
+      <name>tree_stump</name>
+      <pose>6 -5 0 1.5708 0 0</pose>
+    </include>
+    <include>
+    <uri>../models/tree_stump</uri>
+      <name>tree_stump2</name>
+      <pose>1.0 3.0 0 1.5708 0 0</pose>
     </include>
 
   </world>
