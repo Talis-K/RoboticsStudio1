@@ -1,9 +1,0 @@
-setup.cfg
-setup.py
-chainsaw_detector2/__init__.py
-chainsaw_detector2/chainsaw_detector_node.py
-chainsaw_detector2/test_audio_publisher.py
-chainsaw_detector2.egg-info/PKG-INFO
-chainsaw_detector2.egg-info/SOURCES.txt
-chainsaw_detector2.egg-info/dependency_links.txt
-chainsaw_detector2.egg-info/top_level.txt
